@@ -11,6 +11,9 @@ public sealed class PosPeripheralService : IDisposable
 
     public PosPeripheralService(PosSettings settings) => this.settings = settings;
 
+    public bool IsDisplayOpen => display?.IsOpen == true;
+    public bool IsPrinterOpen => printer?.IsOpen == true;
+
     public void ConnectDisplay()
     {
         display?.Dispose();

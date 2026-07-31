@@ -53,17 +53,24 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
 
     private bool CanScanBarcode() => !IsBusy && !IsCheckoutMode && !string.IsNullOrWhiteSpace(BarcodeText);
 
-    /// <summary>BaseWindow.OnContentRendered から呼ばれる初期化。周辺機器へ自動接続を試みる。</summary>
+    /// <summary>
+    /// BaseWindow.OnContentRendered から呼ばれる初期化。
+    /// 客用ディスプレイのみ接続する。レシートプリンタは売上開始時（最初の明細追加時）に接続する。
+    /// </summary>
     [RelayCommand]
     private void Init()
     {
-        var failures = new List<string>();
-        try { peripherals.ConnectDisplay(); IsDisplayConnected = true; } catch (Exception ex) { failures.Add($"DM-D30: {ex.Message}"); }
-        try { peripherals.ConnectPrinter(); IsPrinterConnected = true; } catch (Exception ex) { failures.Add($"TM-m30II: {ex.Message}"); }
-
-        StatusMessage = failures.Count == 0
-            ? "バーコードを読み取ってください。"
-            : $"周辺機器に接続できませんでした（{string.Join(" / ", failures)}）。接続ボタンで再試行してください。";
+        try
+        {
+            peripherals.ConnectDisplay();
+            IsDisplayConnected = true;
+            StatusMessage = "バーコードを読み取ってください。";
+        }
+        catch (Exception ex)
+        {
+            IsDisplayConnected = false;
+            StatusMessage = $"DM-D30 に接続できませんでした（{ex.Message}）。接続ボタンで再試行してください。";
+        }
     }
 
     /// <summary>ESC。会計中なら明細に戻り、そうでなければ画面を閉じる。</summary>
@@ -85,10 +92,11 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
         catch (Exception ex) { IsDisplayConnected = false; StatusMessage = $"DM-D30 接続エラー: {ex.Message}"; }
     }
 
+    /// <summary>接続ボタンによる手動接続。Open がブロックしうるため UI スレッドから外す。</summary>
     [RelayCommand]
-    private void ConnectPrinter()
+    private async Task ConnectPrinter()
     {
-        try { peripherals.ConnectPrinter(); IsPrinterConnected = true; StatusMessage = $"TM-m30II を {settings.PrinterPortName} に接続しました。"; }
+        try { await Task.Run(peripherals.ConnectPrinter); IsPrinterConnected = true; StatusMessage = $"TM-m30II を {settings.PrinterPortName} に接続しました。"; }
         catch (Exception ex) { IsPrinterConnected = false; StatusMessage = $"TM-m30II 接続エラー: {ex.Message}"; }
     }
 
@@ -101,6 +109,9 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
         {
             var product = await client.LookupProductAsync(barcode, cancellationToken);
             if (product == null) { StatusMessage = $"バーコードが見つかりません: {barcode}"; return; }
+
+            // 明細が空の状態から 1 件目を積む＝この読取が売上の開始
+            var isSaleStart = CartLines.Count == 0;
             var line = CartLines.FirstOrDefault(item => string.Equals(item.Barcode, barcode, StringComparison.OrdinalIgnoreCase));
             if (line == null)
             {
@@ -114,10 +125,38 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
             NotifyTotalsChanged();
             await peripherals.UpdateDisplayAsync($"点数 {line.Quantity:N0} 金額 {line.Amount:N0}", $"合計 {TotalQuantity:N0}点 {TotalAmount:N0}", cancellationToken);
             StatusMessage = $"{line.Name} を追加しました。";
+
+            // 売上開始時にレシートプリンタへ接続し、失敗はこの時点で通知する
+            // （会計確定後の印字で初めて気付くと、売上だけ登録されてレシートが出せない）
+            if (isSaleStart) await ConnectPrinterOnSaleStartAsync(cancellationToken);
         }
         catch (OperationCanceledException) { StatusMessage = "バーコード読取を中止しました。"; }
         catch (Exception ex) { StatusMessage = $"バーコード読取エラー: {ex.Message}"; }
         finally { IsBusy = false; ScanBarcodeCommand.NotifyCanExecuteChanged(); }
+    }
+
+    /// <summary>
+    /// 売上開始時のプリンタ接続。既に開いていれば何もしない。失敗はステータスに即時表示する。
+    /// Bluetooth 仮想 COM の Open は数秒ブロックすることがあるため、UI スレッドから外して実行する。
+    /// </summary>
+    private async Task ConnectPrinterOnSaleStartAsync(CancellationToken cancellationToken)
+    {
+        if (peripherals.IsPrinterOpen) { IsPrinterConnected = true; return; }
+
+        try
+        {
+            await Task.Run(peripherals.ConnectPrinter, cancellationToken);
+            IsPrinterConnected = true;
+        }
+        catch (OperationCanceledException)
+        {
+            IsPrinterConnected = false;
+        }
+        catch (Exception ex)
+        {
+            IsPrinterConnected = false;
+            StatusMessage = $"TM-m30II 接続エラー: {ex.Message}／このままではレシートを印字できません。接続ボタンで再試行してください。";
+        }
     }
 
     [RelayCommand]

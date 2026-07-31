@@ -5,6 +5,27 @@ AI エージェントによる作業ログ。新しい作業を **先頭に挿�
 
 ---
 
+## [2026-07-31] 13:10 TM-m30IIプリンタの接続タイミングを売上開始時に変更
+### Agent
+- [Claude Opus 5 : Anthropic]
+### Editor
+- [ClaudeCode]
+### 目的
+- ユーザーからの要望：TM-m30 プリンタは売上開始時に接続し、接続エラーがあればその時点で表示する。
+### 実施内容
+- ViewModels/06Uriage/PosUriageInputViewModel.cs: `Init`（画面表示時）でのプリンタ接続をやめ、DM-D30 のみ接続するよう変更。`ScanBarcode` で明細が 0 件から 1 件目を積んだとき（＝売上開始）に `ConnectPrinterOnSaleStartAsync` を呼ぶよう追加。接続失敗時はその場でステータスに「TM-m30II 接続エラー: … ／このままではレシートを印字できません。接続ボタンで再試行してください。」を表示する。
+- ViewModels/06Uriage/PosUriageInputViewModel.cs: 手動接続の `ConnectPrinterCommand` を async 化。
+- Services/PosPeripheralService.cs: 接続状態を照会する `IsDisplayOpen` / `IsPrinterOpen` を追加。
+### 技術決定 Why
+- 接続タイミングを会計時ではなく売上開始時にしたのは、会計確定後の印字で初めて接続不良に気付くと、売上だけ登録されてレシートが出せない状態になるため。1 件目の読取時点で判明すれば、客を待たせる前に復旧できる。
+- 2 件目以降の読取では `IsPrinterOpen` で判定して再接続しない（毎回 Dispose→Open すると読取が遅くなるため）。
+- Bluetooth 仮想 COM の `SerialPort.Open()` は数秒ブロックすることがあるため、`Task.Run` で UI スレッドから外した。
+### 確認
+- `dotnet build cvpos10.slnx` 成功（0 警告 / 0 エラー）。
+- 起動確認：売上入力画面の表示 OK。実機（COM6 / TM-m30II）での接続確認は未実施。
+
+---
+
 ## [2026-07-31] 12:35 ログイン後の売上入力遷移修正とMaterialDesign再構成
 ### Agent
 - [Claude Opus 5 : Anthropic]
