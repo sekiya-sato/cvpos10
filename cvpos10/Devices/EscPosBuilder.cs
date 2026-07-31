@@ -13,8 +13,7 @@ public sealed class EscPosBuilder
 {
     private static readonly byte[] InitializeCommand = [0x1B, 0x40];
     private static readonly byte[] SelectShiftJisCommand = [0x1C, 0x43, 0x01];
-    private static readonly byte[] EnterKanjiModeCommand = [0x1C, 0x26];
-    private static readonly byte[] ExitKanjiModeCommand = [0x1C, 0x2E];
+    private static readonly byte[] SelectJapaneseInternationalCharacterSetCommand = [0x1B, 0x52, 0x08];
     private static readonly byte[] FullCutCommand = [0x1D, 0x56, 0x00];
 
     private readonly List<byte> buffer = [];
@@ -34,8 +33,10 @@ public sealed class EscPosBuilder
 
     public EscPosBuilder Raw(params byte[] command) { buffer.AddRange(command); return this; }
 
-    /// <summary>プリンタを初期化し、Shift_JIS の漢字コード体系を選択する。</summary>
-    public EscPosBuilder Initialize() => Raw(InitializeCommand).Raw(SelectShiftJisCommand);
+    /// <summary>プリンタを初期化し、Shift_JIS と日本の国際文字セットを選択する。</summary>
+    public EscPosBuilder Initialize() => Raw(InitializeCommand)
+        .Raw(SelectShiftJisCommand)
+        .Raw(SelectJapaneseInternationalCharacterSetCommand);
 
     public EscPosBuilder Align(EscPosAlign align) => Raw(0x1B, 0x61, (byte)align);
 
@@ -61,10 +62,10 @@ public sealed class EscPosBuilder
         return this;
     }
 
-    /// <summary>1 行印字する。Shift_JIS の 2 バイト文字だけを漢字モードで出力する。</summary>
+    /// <summary>1 行印字する。Shift_JIS体系では漢字を含む2バイト文字をプリンタが自動処理する。</summary>
     public EscPosBuilder Line(string? text = null)
     {
-        WriteText(text ?? string.Empty);
+        buffer.AddRange(shiftJis.GetBytes(text ?? string.Empty));
         buffer.Add(0x0A);
         return this;
     }
@@ -133,33 +134,6 @@ public sealed class EscPosBuilder
     public EscPosBuilder Cut() => Feed(3).Raw(FullCutCommand);
 
     public byte[] ToArray() => [.. buffer];
-
-    private void WriteText(string text)
-    {
-        var isKanjiMode = false;
-        foreach (var character in text)
-        {
-            var bytes = shiftJis.GetBytes(character.ToString());
-            var requiresKanjiMode = bytes.Length == 2;
-            if (requiresKanjiMode && !isKanjiMode)
-            {
-                buffer.AddRange(EnterKanjiModeCommand);
-                isKanjiMode = true;
-            }
-            else if (!requiresKanjiMode && isKanjiMode)
-            {
-                buffer.AddRange(ExitKanjiModeCommand);
-                isKanjiMode = false;
-            }
-
-            buffer.AddRange(bytes);
-        }
-
-        if (isKanjiMode)
-        {
-            buffer.AddRange(ExitKanjiModeCommand);
-        }
-    }
 
     private int Width(string text) => shiftJis.GetByteCount(text);
 

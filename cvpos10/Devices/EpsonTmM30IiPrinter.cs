@@ -12,6 +12,7 @@ public sealed class EpsonTmM30IiPrinter : IDisposable
     private const int BaudRate = 115200;
     private static readonly byte[] InitializeCommand = { 0x1B, 0x40 };
     private static readonly byte[] SelectShiftJisCommand = { 0x1C, 0x43, 0x01 };
+    private static readonly byte[] SelectJapaneseInternationalCharacterSetCommand = { 0x1B, 0x52, 0x08 };
 
     // GS ( E Function 1 / 2: ユーザー設定モードを開始／終了（終了時にソフトウェアリセット）する。
     private static readonly byte[] EnterUserSettingModeCommand = { 0x1D, 0x28, 0x45, 0x03, 0x00, 0x01, 0x49, 0x4E };
@@ -69,6 +70,7 @@ public sealed class EpsonTmM30IiPrinter : IDisposable
         ConfigurePaperWidth();
         Write(InitializeCommand);
         Write(SelectShiftJisCommand);
+        Write(SelectJapaneseInternationalCharacterSetCommand);
     }
 
     /// <summary>お買上げレシートを印字してカットします。</summary>
