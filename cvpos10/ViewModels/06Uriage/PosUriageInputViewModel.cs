@@ -1,12 +1,17 @@
 using CodeShare;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
-using Dmd30CustomerDisplay.Services;
+using CvPos10.Models;
+using CvPos10.Services;
 using System.Collections.ObjectModel;
 
-namespace Dmd30CustomerDisplay.ViewModels;
+namespace CvPos10.ViewModels._06Uriage;
 
-public partial class PosViewModel : ObservableObject, IDisposable
+/// <summary>
+/// 売上入力（バーコード読取 → 明細 → 会計 → レシート印字）。
+/// ログイン直後に表示されるメイン画面。
+/// </summary>
+public partial class PosUriageInputViewModel : ObservableObject, IDisposable
 {
     private readonly PosSettings settings;
     private readonly PosGrpcClient client;
@@ -14,22 +19,32 @@ public partial class PosViewModel : ObservableObject, IDisposable
     private string checkoutClientSaleId = string.Empty;
     private bool disposed;
 
+    /// <summary>ViewModel から View に閉じるよう要求する（BaseWindow の ExitCommand 経由）</summary>
+    public event EventHandler? CloseRequested;
+
     [ObservableProperty, NotifyCanExecuteChangedFor(nameof(ScanBarcodeCommand))] public partial string BarcodeText { get; set; } = string.Empty;
     [ObservableProperty] public partial ObservableCollection<PosCartLine> CartLines { get; set; } = [];
     [ObservableProperty] public partial PosCartLine? SelectedLine { get; set; }
     [ObservableProperty] public partial string StatusMessage { get; set; } = "バーコードを読み取ってください。";
     [ObservableProperty] public partial bool IsCheckoutMode { get; set; }
     [ObservableProperty] public partial bool IsBusy { get; set; }
+    [ObservableProperty] public partial bool IsDisplayConnected { get; set; }
+    [ObservableProperty] public partial bool IsPrinterConnected { get; set; }
     [ObservableProperty, NotifyPropertyChangedFor(nameof(PaymentAmount), nameof(ChangeAmount))] public partial int CashAmount { get; set; }
     [ObservableProperty, NotifyPropertyChangedFor(nameof(PaymentAmount), nameof(ChangeAmount))] public partial int CardAmount { get; set; }
     [ObservableProperty, NotifyPropertyChangedFor(nameof(PaymentAmount), nameof(ChangeAmount))] public partial int OtherAmount { get; set; }
 
+    public string StoreName => settings.StoreName;
+    public string LoginId => AppGlobal.LoginId;
     public int TotalQuantity => CartLines.Sum(line => line.Quantity);
     public int TotalAmount => CartLines.Sum(line => line.Amount);
     public int PaymentAmount => checked(CashAmount + CardAmount + OtherAmount);
     public int ChangeAmount => Math.Max(0, PaymentAmount - TotalAmount);
 
-    public PosViewModel(PosSettings settings, PosGrpcClient client, PosPeripheralService peripherals)
+    /// <summary>XAML の DataContext 宣言用。AppGlobal から共有インスタンスを取得する。</summary>
+    public PosUriageInputViewModel() : this(AppGlobal.Settings, AppGlobal.Client, AppGlobal.Peripherals) { }
+
+    public PosUriageInputViewModel(PosSettings settings, PosGrpcClient client, PosPeripheralService peripherals)
     {
         this.settings = settings;
         this.client = client;
@@ -38,18 +53,43 @@ public partial class PosViewModel : ObservableObject, IDisposable
 
     private bool CanScanBarcode() => !IsBusy && !IsCheckoutMode && !string.IsNullOrWhiteSpace(BarcodeText);
 
+    /// <summary>BaseWindow.OnContentRendered から呼ばれる初期化。周辺機器へ自動接続を試みる。</summary>
+    [RelayCommand]
+    private void Init()
+    {
+        var failures = new List<string>();
+        try { peripherals.ConnectDisplay(); IsDisplayConnected = true; } catch (Exception ex) { failures.Add($"DM-D30: {ex.Message}"); }
+        try { peripherals.ConnectPrinter(); IsPrinterConnected = true; } catch (Exception ex) { failures.Add($"TM-m30II: {ex.Message}"); }
+
+        StatusMessage = failures.Count == 0
+            ? "バーコードを読み取ってください。"
+            : $"周辺機器に接続できませんでした（{string.Join(" / ", failures)}）。接続ボタンで再試行してください。";
+    }
+
+    /// <summary>ESC。会計中なら明細に戻り、そうでなければ画面を閉じる。</summary>
+    [RelayCommand]
+    private void Exit()
+    {
+        if (IsCheckoutMode)
+        {
+            CancelCheckout();
+            return;
+        }
+        CloseRequested?.Invoke(this, EventArgs.Empty);
+    }
+
     [RelayCommand]
     private void ConnectDisplay()
     {
-        try { peripherals.ConnectDisplay(); StatusMessage = $"DM-D30 を {settings.DisplayPortName} に接続しました。"; }
-        catch (Exception ex) { StatusMessage = $"DM-D30 接続エラー: {ex.Message}"; }
+        try { peripherals.ConnectDisplay(); IsDisplayConnected = true; StatusMessage = $"DM-D30 を {settings.DisplayPortName} に接続しました。"; }
+        catch (Exception ex) { IsDisplayConnected = false; StatusMessage = $"DM-D30 接続エラー: {ex.Message}"; }
     }
 
     [RelayCommand]
     private void ConnectPrinter()
     {
-        try { peripherals.ConnectPrinter(); StatusMessage = $"TM-m30II を {settings.PrinterPortName} に接続しました。"; }
-        catch (Exception ex) { StatusMessage = $"TM-m30II 接続エラー: {ex.Message}"; }
+        try { peripherals.ConnectPrinter(); IsPrinterConnected = true; StatusMessage = $"TM-m30II を {settings.PrinterPortName} に接続しました。"; }
+        catch (Exception ex) { IsPrinterConnected = false; StatusMessage = $"TM-m30II 接続エラー: {ex.Message}"; }
     }
 
     [RelayCommand(CanExecute = nameof(CanScanBarcode), IncludeCancelCommand = true)]
@@ -71,9 +111,7 @@ public partial class PosViewModel : ObservableObject, IDisposable
 
             SelectedLine = line;
             BarcodeText = string.Empty;
-            OnPropertyChanged(nameof(TotalQuantity));
-            OnPropertyChanged(nameof(TotalAmount));
-            OnPropertyChanged(nameof(ChangeAmount));
+            NotifyTotalsChanged();
             await peripherals.UpdateDisplayAsync($"点数 {line.Quantity:N0} 金額 {line.Amount:N0}", $"合計 {TotalQuantity:N0}点 {TotalAmount:N0}", cancellationToken);
             StatusMessage = $"{line.Name} を追加しました。";
         }
@@ -117,7 +155,7 @@ public partial class PosViewModel : ObservableObject, IDisposable
             SelectedLine = null;
             IsCheckoutMode = false;
             CashAmount = CardAmount = OtherAmount = 0;
-            OnPropertyChanged(nameof(TotalQuantity)); OnPropertyChanged(nameof(TotalAmount)); OnPropertyChanged(nameof(ChangeAmount));
+            NotifyTotalsChanged();
             StatusMessage = $"売上No. {response.SaleId:N0} を確定し、レシートを印字しました。";
         }
         catch (OperationCanceledException) { StatusMessage = "会計処理を中止しました。"; }
@@ -125,11 +163,17 @@ public partial class PosViewModel : ObservableObject, IDisposable
         finally { IsBusy = false; }
     }
 
+    private void NotifyTotalsChanged()
+    {
+        OnPropertyChanged(nameof(TotalQuantity));
+        OnPropertyChanged(nameof(TotalAmount));
+        OnPropertyChanged(nameof(ChangeAmount));
+    }
+
     public void Dispose()
     {
         if (disposed) return;
-        client.Dispose();
-        peripherals.Dispose();
+        AppGlobal.Shutdown();
         disposed = true;
     }
 }

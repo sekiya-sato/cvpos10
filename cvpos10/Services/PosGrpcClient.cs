@@ -6,7 +6,7 @@ using ProtoBuf.Grpc;
 using ProtoBuf.Grpc.Client;
 using System.Net.Http;
 
-namespace Dmd30CustomerDisplay.Services;
+namespace CvPos10.Services;
 
 public sealed class PosGrpcClient : IDisposable
 {

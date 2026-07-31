@@ -1,7 +1,8 @@
+using CvPos10.Models;
 using System.IO.Ports;
 using System.Text;
 
-namespace Dmd30CustomerDisplay;
+namespace CvPos10.Devices;
 
 /// <summary>
 /// TM-m30II へ Bluetooth の仮想 COM ポート経由で ESC/POS コマンドを送信します。

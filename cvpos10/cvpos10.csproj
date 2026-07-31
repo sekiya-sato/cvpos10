@@ -5,20 +5,26 @@
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <RootNamespace>CvPos10</RootNamespace>
+    <AssemblyTitle>CvPos10</AssemblyTitle>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="Grpc.Net.Client" Version="2.80.0" />
+    <PackageReference Include="MaterialDesignColors" Version="5.3.2" />
+    <PackageReference Include="MaterialDesignThemes" Version="5.3.2" />
+    <PackageReference Include="Microsoft.Xaml.Behaviors.Wpf" Version="1.1.142" />
     <PackageReference Include="protobuf-net.Grpc.ClientFactory" Version="1.2.2" />
     <PackageReference Include="System.IO.Ports" Version="10.0.0" />
   </ItemGroup>
-	<ItemGroup>
-		<ProjectReference Include="..\..\cv10\CodeShare\CodeShare.csproj" />
-		<ProjectReference Include="..\..\cv10\CvAsset\CvAsset.csproj" />
-	</ItemGroup>
 
-	<ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\cv10\CodeShare\CodeShare.csproj" />
+    <ProjectReference Include="..\..\cv10\CvAsset\CvAsset.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

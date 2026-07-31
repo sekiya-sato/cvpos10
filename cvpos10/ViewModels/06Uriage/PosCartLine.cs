@@ -1,6 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 
-namespace Dmd30CustomerDisplay.ViewModels;
+namespace CvPos10.ViewModels._06Uriage;
 
 public partial class PosCartLine : ObservableObject
 {

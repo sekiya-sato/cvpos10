@@ -1,4 +1,4 @@
-namespace Dmd30CustomerDisplay;
+namespace CvPos10.Models;
 
 public sealed record ReceiptData(long SaleId, DateTime SoldAt, string StoreName, IReadOnlyList<ReceiptLine> Lines, int TotalQuantity, int TotalAmount, int CashAmount, int CardAmount, int OtherAmount, int ChangeAmount);
 

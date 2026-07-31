@@ -1,4 +1,7 @@
-namespace Dmd30CustomerDisplay.Services;
+using CvPos10.Devices;
+using CvPos10.Models;
+
+namespace CvPos10.Services;
 
 public sealed class PosPeripheralService : IDisposable
 {

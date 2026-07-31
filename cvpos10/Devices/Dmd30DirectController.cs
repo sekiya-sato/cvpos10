@@ -1,7 +1,7 @@
 using System.IO.Ports;
 using System.Text;
 
-namespace Dmd30CustomerDisplay;
+namespace CvPos10.Devices;
 
 /// <summary>
 /// EPSON DM-D30 にESC/POS互換のシリアルコマンドを送信します。

@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.IO;
 
-namespace Dmd30CustomerDisplay.Services;
+namespace CvPos10.Services;
 
 public sealed class PosTokenStore
 {
