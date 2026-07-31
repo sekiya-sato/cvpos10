@@ -5,6 +5,43 @@ AI エージェントによる作業ログ。新しい作業を **先頭に挿�
 
 ---
 
+## [2026-07-31] 13:20 レシート・領収書の様式対応と58mm/80mm用紙幅の自動判定
+### Agent
+- [Claude Opus 5 : Anthropic]
+### Editor
+- [ClaudeCode]
+### 目的
+- ユーザーからの要望：添付見本と同じ様式のレシートと領収書（領収書ボタンを追加し、必要なときのみ印字）を印字可能にする。58mm / 80mm の 2 種類の用紙幅にそれぞれ対応し、どちらも幅をできるだけ使って表示する。
+### 実施内容
+- Devices/PosPaperWidth.cs: 新規。用紙幅（58mm=30桁 / 80mm=48桁、Font A 換算）とバーコードのモジュール幅を定義。
+- Devices/EscPosBuilder.cs: 新規。ESC/POS コマンド列のビルダ。Shift_JIS のバイト数を桁数として左右振り分け・右寄せ・区切り線・折り返しを行い、倍角中は有効桁数を半分として扱う。CODE39 バーコード出力も持つ。
+- Devices/ReceiptDocumentBuilder.cs: 新規。ReceiptData からお買上げレシートと領収書のコマンド列を組み立てる。桁数は用紙幅から決まるため、同じコードで 58mm / 80mm の双方が幅いっぱいになる。
+- Devices/EpsonTmM30IiPrinter.cs: Open 時に `GS ( E` Function 6 / カスタム値 a=3（1D 28 45 02 00 06 03）で用紙幅を問い合わせ、応答 `37 27 33 1F <値> 00` の値 "2"=58mm / "6"=80mm を解釈するよう変更。応答なし・未知の値のときは appsettings.json の PaperWidthMm を使う。PrintTaxInvoice（領収書）を追加。SerialPort に ReadTimeout を追加。
+- Models/ReceiptData.cs: 店舗情報（名称・住所・電話）、販売員コード、明細（商品コード・商品名・カラーサイズ・JAN）、税抜小計・消費税・税込合計、アプリバージョンを持つよう拡張。
+- Services/PosSettings.cs: StoreAddress / StorePhone / StaffCode / TaxRatePercent / PaperWidthMm を追加。ResolvedStaffCode（未設定時は StaffId の 6 桁ゼロ埋め）を追加。
+- Services/PosPeripheralService.cs: PrintTaxInvoiceAsync と PaperWidth / IsPaperWidthDetected を追加。
+- ViewModels/06Uriage/PosUriageInputViewModel.cs: SubTotal（税抜小計）/ TaxAmount / TotalAmount（税込）を分離。LastReceipt を保持し、PrintTaxInvoiceCommand（領収書ボタン）を追加。売上確定後は印字前に明細を締め、印字失敗でも取引が宙に浮かないようにした。
+- ViewModels/06Uriage/PosCartLine.cs: ProductCode を追加（レシートの商品コード用）。
+- Views/06Uriage/PosUriageInputView.xaml: ヘッダーに［領収書］ボタンを追加。合計パネルと会計ダイアログに税抜小計・消費税を表示。明細カードのヘッダーに出していたステータスはフッターと重複していたため件数表示のみに変更。
+- Resources/UIPos.xaml: PosTotalSubText を追加。PosSecondaryButton の土台を MaterialDesignOutlinedButton から ToolCommandButton に変更。
+- appsettings.json: 追加した設定項目の既定値を記載。
+### 技術決定 Why
+- 消費税はサーバ（CvServer/PointOfSaleService）が一切持たず `Total = 数量 × 上代` のみのため、上代を税抜とみなす外税方式をクライアント側で計算する方針をユーザーと合意した。cv10 を変更しない制約があるため、画面とレシートの釣銭はクライアント計算値（税込合計に対する釣銭）を使う。Tran01Tenuri.Total は税抜のまま（売上計上としては妥当）だが、JposPayment.ChangeAmount はサーバが税抜合計から計算するため実際とズレる。
+- 桁数を EscPosBuilder に持たせ、レイアウト側は「左右振り分け」「右寄せ」「幅いっぱいの区切り線」だけを指定する構成にした。用紙幅ごとに別レイアウトを書かずに済み、幅いっぱいを使える。
+- 全角文字が 2 桁を占めるため、桁揃えは文字数ではなく Shift_JIS のバイト数で計算している。
+- 領収書は会計後にカートを空にしても印字できるよう、確定時の ReceiptData を LastReceipt として保持する方式にした。
+- PosSecondaryButton は MaterialDesignOutlinedButton 由来だと前景色がプライマリ色固定になり、同色の ColorZone PrimaryMid 上で不可視になっていた（既存の不具合）。継承前景色を使う ToolCommandButton を土台に変更した。
+### 影響範囲
+- 印字処理全体とレシートデータ構造。会計時の請求額が税込に変わる（従来は税抜のまま請求していた）。cv10 側のファイルは変更していない。
+### 確認
+- `dotnet build cvpos10.slnx -c Release` 成功（0 警告 / 0 エラー）。※別インスタンス起動中のため Debug 出力はロックされており未ビルド。
+- 使い捨ての検証プログラム（スクラッチパッド、リポジトリ未追加）で 58mm / 80mm のレシート・領収書を文字列展開し、両方とも桁いっぱいに収まり折り返しが正しいことを確認。
+- 用紙幅応答のパースを 8 ケース（ユーザー提示の 58mm/80mm 応答例、先頭ゴミ、未知値、NUL 欠落、区切りなし、空、null）で確認し全件期待どおり。
+- 画面起動確認：ヘッダーの［領収書］ボタン（直近売上なしのため無効表示）、合計パネルの税抜小計・消費税表示を目視確認。
+- 実機（TM-m30II）での印字と用紙幅問い合わせは未実施。
+
+---
+
 ## [2026-07-31] 13:10 TM-m30IIプリンタの接続タイミングを売上開始時に変更
 ### Agent
 - [Claude Opus 5 : Anthropic]

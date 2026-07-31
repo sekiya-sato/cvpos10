@@ -46,10 +46,16 @@
 						Text="会計" />
 				</StackPanel>
 
-				<TextBlock Grid.Row="1"
-					Margin="0,4,0,16"
-					FontSize="20"
-					Text="{Binding TotalAmount, StringFormat=ご請求額 {0:N0}円}" />
+				<StackPanel Grid.Row="1"
+					Margin="0,4,0,16">
+					<TextBlock Style="{StaticResource StatusTextBlockStyle}"
+						Text="{Binding SubTotal, StringFormat=税抜小計 {0:N0}円}" />
+					<TextBlock Style="{StaticResource StatusTextBlockStyle}"
+						Text="{Binding TaxAmount, StringFormat=消費税 {0:N0}円}" />
+					<TextBlock Margin="0,4,0,0"
+						FontSize="22" FontWeight="Bold"
+						Text="{Binding TotalAmount, StringFormat=ご請求額 {0:N0}円}" />
+				</StackPanel>
 
 				<Grid Grid.Row="2">
 					<Grid.RowDefinitions>
@@ -131,6 +137,22 @@
 						<TextBlock Margin="0,0,16,0" VerticalAlignment="Center"
 							FontSize="13"
 							Text="{Binding LoginId}" />
+						<Button Command="{Binding PrintTaxInvoiceCommand}"
+							Style="{StaticResource PosSecondaryButton}"
+							ToolTip="直近に確定した売上の領収書を印字する（必要なときのみ）">
+							<StackPanel Orientation="Horizontal">
+								<materialDesign:PackIcon VerticalAlignment="Center"
+									Kind="ReceiptText" />
+								<TextBlock Margin="6,0,0,0" VerticalAlignment="Center"
+									Text="領収書" />
+							</StackPanel>
+						</Button>
+						<Separator Margin="8,4"
+							Style="{StaticResource MaterialDesignSeparator}">
+							<Separator.LayoutTransform>
+								<RotateTransform Angle="90" />
+							</Separator.LayoutTransform>
+						</Separator>
 						<Button Command="{Binding ConnectDisplayCommand}"
 							Style="{StaticResource PosSecondaryButton}"
 							ToolTip="客用ディスプレイ DM-D30 に接続する">
@@ -221,7 +243,7 @@
 						<RowDefinition Height="*" />
 					</Grid.RowDefinitions>
 
-					<!--  カードヘッダー: 件数 + メッセージ  -->
+					<!--  カードヘッダー: 件数（メッセージはフッターに集約する）  -->
 					<Border Grid.Row="0"
 						Padding="12,8"
 						Background="{DynamicResource MaterialDesignToolBarBackground}"
@@ -231,10 +253,12 @@
 								DockPanel.Dock="Right"
 								Style="{StaticResource StatusTextBlockStyle}"
 								Text="{Binding CartLines.Count, StringFormat={}明細: {0:N0}件}" />
-							<TextBlock VerticalAlignment="Center"
-								Style="{StaticResource StatusTextBlockStyle}"
-								Text="{Binding StatusMessage}"
-								TextTrimming="CharacterEllipsis" />
+							<StackPanel Orientation="Horizontal">
+								<materialDesign:PackIcon Margin="0,0,6,0" VerticalAlignment="Center"
+									Kind="FormatListBulleted" />
+								<TextBlock VerticalAlignment="Center"
+									FontWeight="SemiBold" Text="明細" />
+							</StackPanel>
 						</DockPanel>
 					</Border>
 
@@ -308,6 +332,10 @@
 							Text="合計" />
 						<TextBlock Style="{StaticResource PosTotalQuantityText}"
 							Text="{Binding TotalQuantity, StringFormat=合計点数 {0:N0}点}" />
+						<TextBlock Style="{StaticResource PosTotalSubText}"
+							Text="{Binding SubTotal, StringFormat=税抜小計 {0:N0}円}" />
+						<TextBlock Style="{StaticResource PosTotalSubText}"
+							Text="{Binding TaxAmount, StringFormat=消費税 {0:N0}円}" />
 						<TextBlock Style="{StaticResource PosTotalAmountText}"
 							Text="{Binding TotalAmount, StringFormat=合計金額 {0:N0}円}" />
 						<Button Margin="0,12,0,0"

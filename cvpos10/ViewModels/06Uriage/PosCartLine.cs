@@ -7,6 +7,7 @@ public partial class PosCartLine : ObservableObject
     [ObservableProperty] public partial int LineNo { get; set; }
     [ObservableProperty] public partial string Barcode { get; set; } = string.Empty;
     [ObservableProperty] public partial long ProductId { get; set; }
+    [ObservableProperty] public partial string ProductCode { get; set; } = string.Empty;
     [ObservableProperty] public partial long ColorId { get; set; }
     [ObservableProperty] public partial string ColorCode { get; set; } = string.Empty;
     [ObservableProperty] public partial string ColorName { get; set; } = string.Empty;

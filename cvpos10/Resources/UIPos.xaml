@@ -45,6 +45,14 @@
 		<Setter Property="Margin" Value="0,4,0,0" />
 	</Style>
 
+	<!--  合計パネル内の内訳（税抜小計・消費税）  -->
+	<Style x:Key="PosTotalSubText"
+		TargetType="TextBlock">
+		<Setter Property="Foreground" Value="{DynamicResource PosTotalPanelForegroundBrush}" />
+		<Setter Property="FontSize" Value="14" />
+		<Setter Property="Opacity" Value="0.85" />
+	</Style>
+
 	<Style x:Key="PosTotalAmountText"
 		TargetType="TextBlock">
 		<Setter Property="Foreground" Value="{DynamicResource PosTotalPanelForegroundBrush}" />
@@ -71,9 +79,13 @@
 		<Setter Property="Foreground" Value="White" />
 	</Style>
 
-	<!--  周辺機器接続などの副次操作ボタン  -->
+	<!--
+		ヘッダー(ColorZone PrimaryMid)上に置く副次操作ボタン。
+		MaterialDesignOutlinedButton は前景色がプライマリ色に固定されるため、
+		同色の ColorZone 上では見えなくなる。継承した前景色を使う ToolCommandButton を土台にする。
+	-->
 	<Style x:Key="PosSecondaryButton"
-		BasedOn="{StaticResource MaterialDesignOutlinedButton}"
+		BasedOn="{StaticResource ToolCommandButton}"
 		TargetType="Button">
 		<Setter Property="Height" Value="36" />
 		<Setter Property="Margin" Value="4,0" />

@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using CvPos10.Models;
 using CvPos10.Services;
 using System.Collections.ObjectModel;
+using System.Reflection;
 
 namespace CvPos10.ViewModels._06Uriage;
 
@@ -27,17 +28,31 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
     [ObservableProperty] public partial PosCartLine? SelectedLine { get; set; }
     [ObservableProperty] public partial string StatusMessage { get; set; } = "バーコードを読み取ってください。";
     [ObservableProperty] public partial bool IsCheckoutMode { get; set; }
-    [ObservableProperty] public partial bool IsBusy { get; set; }
+    [ObservableProperty, NotifyCanExecuteChangedFor(nameof(PrintTaxInvoiceCommand))] public partial bool IsBusy { get; set; }
     [ObservableProperty] public partial bool IsDisplayConnected { get; set; }
     [ObservableProperty] public partial bool IsPrinterConnected { get; set; }
     [ObservableProperty, NotifyPropertyChangedFor(nameof(PaymentAmount), nameof(ChangeAmount))] public partial int CashAmount { get; set; }
     [ObservableProperty, NotifyPropertyChangedFor(nameof(PaymentAmount), nameof(ChangeAmount))] public partial int CardAmount { get; set; }
     [ObservableProperty, NotifyPropertyChangedFor(nameof(PaymentAmount), nameof(ChangeAmount))] public partial int OtherAmount { get; set; }
 
+    /// <summary>直近に確定した売上。領収書ボタンはこれを印字する。</summary>
+    [ObservableProperty, NotifyCanExecuteChangedFor(nameof(PrintTaxInvoiceCommand))] public partial ReceiptData? LastReceipt { get; set; }
+
     public string StoreName => settings.StoreName;
     public string LoginId => AppGlobal.LoginId;
     public int TotalQuantity => CartLines.Sum(line => line.Quantity);
-    public int TotalAmount => CartLines.Sum(line => line.Amount);
+
+    /// <summary>税抜小計（上代の合計）。サーバが計上する売上金額と一致する。</summary>
+    public int SubTotal => CartLines.Sum(line => line.Amount);
+
+    public int TaxRatePercent => settings.TaxRatePercent;
+
+    /// <summary>消費税額（外税、円未満切り捨て）。</summary>
+    public int TaxAmount => (int)((long)SubTotal * settings.TaxRatePercent / 100);
+
+    /// <summary>お買上合計（税込）。お客様への請求額。</summary>
+    public int TotalAmount => checked(SubTotal + TaxAmount);
+
     public int PaymentAmount => checked(CashAmount + CardAmount + OtherAmount);
     public int ChangeAmount => Math.Max(0, PaymentAmount - TotalAmount);
 
@@ -115,7 +130,7 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
             var line = CartLines.FirstOrDefault(item => string.Equals(item.Barcode, barcode, StringComparison.OrdinalIgnoreCase));
             if (line == null)
             {
-                line = new PosCartLine { LineNo = CartLines.Count + 1, Barcode = barcode, ProductId = product.ProductId, ColorId = product.ColorId, ColorCode = product.ColorCode, ColorName = product.ColorName, SizeId = product.SizeId, SizeCode = product.SizeCode, SizeName = product.SizeName, Name = product.ProductName, UnitPrice = product.UnitPrice, Quantity = 1 };
+                line = new PosCartLine { LineNo = CartLines.Count + 1, Barcode = barcode, ProductId = product.ProductId, ProductCode = product.ProductCode, ColorId = product.ColorId, ColorCode = product.ColorCode, ColorName = product.ColorName, SizeId = product.SizeId, SizeCode = product.SizeCode, SizeName = product.SizeName, Name = product.ProductName, UnitPrice = product.UnitPrice, Quantity = 1 };
                 CartLines.Add(line);
             }
             else line.Quantity++;
@@ -187,24 +202,82 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
             }, cancellationToken);
             if (!response.IsSuccess) { StatusMessage = response.Message; return; }
 
-            var receipt = new ReceiptData(response.SaleId, DateTime.Now, settings.StoreName, [.. CartLines.Select(line => new ReceiptLine(line.Name, line.Quantity, line.UnitPrice, line.Amount))], TotalQuantity, TotalAmount, CashAmount, CardAmount, OtherAmount, response.ChangeAmount);
-            await peripherals.PrintAsync(receipt, cancellationToken);
+            // 売上は確定済み。印字が失敗しても取引を宙ぶらりんにしないよう、先に明細を締めて領収書用に保持する
+            var receipt = BuildReceipt(response.SaleId);
+            LastReceipt = receipt;
             CartLines.Clear();
             checkoutClientSaleId = string.Empty;
             SelectedLine = null;
             IsCheckoutMode = false;
             CashAmount = CardAmount = OtherAmount = 0;
             NotifyTotalsChanged();
-            StatusMessage = $"売上No. {response.SaleId:N0} を確定し、レシートを印字しました。";
+
+            try
+            {
+                await peripherals.PrintAsync(receipt, cancellationToken);
+                StatusMessage = $"売上No. {response.SaleId:N0} を確定し、レシートを印字しました。領収書が必要な場合は［領収書］ボタンを押してください。";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"売上No. {response.SaleId:N0} は確定しましたが、レシートを印字できませんでした（{ex.Message}）。";
+            }
         }
         catch (OperationCanceledException) { StatusMessage = "会計処理を中止しました。"; }
         catch (Exception ex) { StatusMessage = $"会計処理エラー: {ex.Message}"; }
         finally { IsBusy = false; }
     }
 
+    private bool CanPrintTaxInvoice() => !IsBusy && LastReceipt != null;
+
+    /// <summary>［領収書］ボタン。直近に確定した売上の領収書を、必要なときだけ印字する。</summary>
+    [RelayCommand(CanExecute = nameof(CanPrintTaxInvoice), IncludeCancelCommand = true)]
+    private async Task PrintTaxInvoice(CancellationToken cancellationToken)
+    {
+        if (LastReceipt is not { } receipt) return;
+
+        IsBusy = true;
+        try
+        {
+            await peripherals.PrintTaxInvoiceAsync(receipt, cancellationToken);
+            StatusMessage = $"売上No. {receipt.SaleId:N0} の領収書を印字しました。";
+        }
+        catch (OperationCanceledException) { StatusMessage = "領収書の印字を中止しました。"; }
+        catch (Exception ex) { StatusMessage = $"領収書印字エラー: {ex.Message}"; }
+        finally { IsBusy = false; }
+    }
+
+    private ReceiptData BuildReceipt(long saleId) => new(
+        saleId,
+        DateTime.Now,
+        new ReceiptStore(settings.StoreName, settings.StoreAddress, settings.StorePhone),
+        settings.ResolvedStaffCode,
+        [.. CartLines.Select(line => new ReceiptLine(line.ProductCode, line.Name, FormatColorSize(line), line.Barcode, line.Quantity, line.UnitPrice, line.Amount))],
+        TotalQuantity,
+        SubTotal,
+        TaxRatePercent,
+        TaxAmount,
+        TotalAmount,
+        CashAmount,
+        CardAmount,
+        OtherAmount,
+        // サーバは消費税を持たないため釣銭もクライアント計算値（税込合計に対する釣銭）を使う
+        ChangeAmount,
+        AppVersion);
+
+    /// <summary>「10-シロ 00-サンプル」形式のカラー・サイズ表記。</summary>
+    private static string FormatColorSize(PosCartLine line) =>
+        string.Join(' ', new[] { JoinCodeName(line.ColorCode, line.ColorName), JoinCodeName(line.SizeCode, line.SizeName) }.Where(text => text.Length > 0));
+
+    private static string JoinCodeName(string code, string name) =>
+        (code.Length, name.Length) switch { (0, 0) => string.Empty, (0, _) => name, (_, 0) => code, _ => $"{code}-{name}" };
+
+    private static string AppVersion => Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? string.Empty;
+
     private void NotifyTotalsChanged()
     {
         OnPropertyChanged(nameof(TotalQuantity));
+        OnPropertyChanged(nameof(SubTotal));
+        OnPropertyChanged(nameof(TaxAmount));
         OnPropertyChanged(nameof(TotalAmount));
         OnPropertyChanged(nameof(ChangeAmount));
     }
