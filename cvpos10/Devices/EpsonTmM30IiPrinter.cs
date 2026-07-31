@@ -9,8 +9,14 @@ namespace CvPos10.Devices;
 /// </summary>
 public sealed class EpsonTmM30IiPrinter : IDisposable
 {
+    private const int BaudRate = 115200;
     private static readonly byte[] InitializeCommand = { 0x1B, 0x40 };
     private static readonly byte[] SelectShiftJisCommand = { 0x1C, 0x43, 0x01 };
+
+    // GS ( E Function 1 / 2: ユーザー設定モードを開始／終了（終了時にソフトウェアリセット）する。
+    private static readonly byte[] EnterUserSettingModeCommand = { 0x1D, 0x28, 0x45, 0x03, 0x00, 0x01, 0x49, 0x4E };
+    private static readonly byte[] ExitUserSettingModeCommand = { 0x1D, 0x28, 0x45, 0x04, 0x00, 0x02, 0x4F, 0x55, 0x54 };
+    private static readonly byte[] UserSettingModeNotice = { 0x37, 0x20, 0x00 };
 
     // GS ( E pL=2 pH=0 fn=6 a=3 : カスタム値「用紙幅」の設定値送信要求
     private static readonly byte[] QueryPaperWidthCommand = { 0x1D, 0x28, 0x45, 0x02, 0x00, 0x06, 0x03 };
@@ -24,7 +30,7 @@ public sealed class EpsonTmM30IiPrinter : IDisposable
     private readonly PosPaperWidth fallbackPaperWidth;
     private bool disposed;
 
-    public EpsonTmM30IiPrinter(string portName, int baudRate, PosPaperWidth fallbackPaperWidth = PosPaperWidth.Mm58)
+    public EpsonTmM30IiPrinter(string portName, PosPaperWidth fallbackPaperWidth = PosPaperWidth.Mm58)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(portName);
 
@@ -32,7 +38,7 @@ public sealed class EpsonTmM30IiPrinter : IDisposable
         shiftJis = Encoding.GetEncoding(932);
         this.fallbackPaperWidth = fallbackPaperWidth;
         PaperWidth = fallbackPaperWidth;
-        serialPort = new SerialPort(portName, baudRate, Parity.None, 8, StopBits.One)
+        serialPort = new SerialPort(portName, BaudRate, Parity.None, 8, StopBits.One)
         {
             Handshake = Handshake.None,
             WriteTimeout = 5_000,
@@ -60,9 +66,9 @@ public sealed class EpsonTmM30IiPrinter : IDisposable
         }
 
         serialPort.Open();
+        ConfigurePaperWidth();
         Write(InitializeCommand);
         Write(SelectShiftJisCommand);
-        DetectPaperWidth();
     }
 
     /// <summary>お買上げレシートを印字してカットします。</summary>
@@ -81,12 +87,8 @@ public sealed class EpsonTmM30IiPrinter : IDisposable
         Write(ReceiptDocumentBuilder.BuildTaxInvoice(receipt, PaperWidth, shiftJis, DateTime.Now));
     }
 
-    /// <summary>
-    /// カスタム値問い合わせ（GS ( E Function 6, a=3）で設定済みの用紙幅を取得する。
-    /// 応答は 37H 27H '3' 1FH &lt;データ&gt; 00H の形式で、データ "2" が 58mm、"6" が 80mm。
-    /// 取得できなかった場合は設定値（fallbackPaperWidth）のままにする。
-    /// </summary>
-    private void DetectPaperWidth()
+    /// <summary>設定済みの用紙幅を照会し、appsettings.json の指定と異なる場合だけプリンタ設定を更新する。</summary>
+    private void ConfigurePaperWidth()
     {
         PaperWidth = fallbackPaperWidth;
         IsPaperWidthDetected = false;
@@ -95,17 +97,40 @@ public sealed class EpsonTmM30IiPrinter : IDisposable
             serialPort.DiscardInBuffer();
             Write(QueryPaperWidthCommand);
             if (ParsePaperWidthResponse(ReadResponse()) is not { } detected) return;
-            PaperWidth = detected;
+
             IsPaperWidthDetected = true;
+            if (detected == fallbackPaperWidth)
+            {
+                PaperWidth = detected;
+                return;
+            }
+
+            SetPaperWidth(fallbackPaperWidth);
+            PaperWidth = fallbackPaperWidth;
         }
         catch (TimeoutException)
         {
-            // 応答なし（設定によっては問い合わせに応答しない）。設定値のままにする。
+            // 応答なしの場合は不必要な不揮発メモリ書き込みを避け、設定値をレイアウトの既定値として使う。
         }
-        catch (InvalidOperationException)
+    }
+
+    /// <summary>
+    /// GS ( E Function 5（a=3）で用紙幅を設定する。設定は不揮発メモリへ書き込まれるため、実際の設定値と異なる場合だけ呼び出す。
+    /// </summary>
+    private void SetPaperWidth(PosPaperWidth paperWidth)
+    {
+        serialPort.DiscardInBuffer();
+        Write(EnterUserSettingModeCommand);
+        if (!ReadResponse().SequenceEqual(UserSettingModeNotice))
         {
-            // ポートが閉じられた等。設定値のままにする。
+            throw new InvalidOperationException("TM-m30II がユーザー設定モードへの移行を通知しませんでした。");
         }
+
+        Write(BuildSetPaperWidthCommand(paperWidth));
+        Write(ExitUserSettingModeCommand);
+
+        // Function 2 はソフトウェアリセットを実行する。リセット完了前の初期化コマンド送信を避ける。
+        Thread.Sleep(500);
     }
 
     /// <summary>NUL 終端まで応答を読み取る。</summary>
@@ -147,6 +172,9 @@ public sealed class EpsonTmM30IiPrinter : IDisposable
         }
         return null;
     }
+
+    internal static byte[] BuildSetPaperWidthCommand(PosPaperWidth paperWidth) =>
+    [0x1D, 0x28, 0x45, 0x04, 0x00, 0x05, 0x03, paperWidth.CustomizedValue(), 0x00];
 
     private void EnsureOpen()
     {

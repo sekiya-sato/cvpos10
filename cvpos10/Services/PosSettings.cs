@@ -25,13 +25,11 @@ public sealed class PosSettings
     public int TaxRatePercent { get; init; } = 10;
 
     public string DisplayPortName { get; init; } = "COM1";
-    public int DisplayBaudRate { get; init; } = 19200;
     public string PrinterPortName { get; init; } = "COM6";
-    public int PrinterBaudRate { get; init; } = 115200;
 
     /// <summary>
-    /// レシート用紙幅(mm)。58 または 80。
-    /// 接続時にプリンタへ問い合わせて自動判定するため、通常は判定できなかった場合の既定値として使う。
+    /// レシート用紙幅(mm)。58 または 80。接続時に TM-m30II の設定もこの値へ切り替える。
+    /// 用紙幅の問い合わせに応答しない場合は、レイアウト上の既定値としてのみ使う。
     /// </summary>
     public int PaperWidthMm { get; init; } = 58;
 

@@ -5,6 +5,30 @@ AI エージェントによる作業ログ。新しい作業を **先頭に挿�
 
 ---
 
+## [2026-07-31] 13:59 TM-m30IIの文字コード・用紙幅切替・通信速度設定の修正
+### Agent
+- [GPT-5 : OpenAI]
+### Editor
+- [Codex]
+### 目的
+- ユーザーからの要望：TM-m30IIの印字で半角文字が化ける問題を解消し、appsettings.json の用紙幅（58 / 80）で本体設定も切り替える。BaudRateを設定ファイルから削除して機器側に固定し、ESC/POS調査手順をスキル化する。
+### 実施内容
+- Devices/EscPosBuilder.cs: CP932の2バイト文字だけを `FS &` / `FS .` で囲むよう変更。半角英数・記号・半角カナは通常モードで送るようにした。
+- Devices/EpsonTmM30IiPrinter.cs: `GS ( E` Function 6で現在の紙幅を照会し、`PaperWidthMm` と異なる場合だけFunction 1 → 5（a=3、58mm=2 / 80mm=6）→ 2でTM-m30II本体の設定を更新するよう追加。設定モード開始通知を確認し、リセット後に初期化する。
+- Devices/PosPaperWidth.cs: TM-m30IIの紙幅カスタム値への変換を追加。
+- Devices/Dmd30DirectController.cs, Devices/EpsonTmM30IiPrinter.cs, Services/PosPeripheralService.cs, Services/PosSettings.cs, appsettings.json: Display / Printer のBaudRateをappsettings.jsonから削除し、DM-D30=19200、TM-m30II=115200として各デバイス実装内に固定した。
+- .agents/skills/epson-escpos-research/SKILL.md: EPSON公式リファレンスの調査URL、検索式、文字コード・用紙幅設定の確認手順を追加。
+### 技術決定 Why
+- `FS &` はJIS漢字モードを選択し、その間の文字列を2バイトとして処理する。従来は行全体を囲んでいたため、半角文字が2バイト文字として解釈されていた。全角文字の連続範囲だけを切り替えることで、半角と日本語を同じ行で正しく併用する。
+- 紙幅設定は不揮発メモリへ書き込むため、Function 6の読出し結果が設定値と異なる場合だけFunction 5で更新し、過剰な書込みを避ける。
+### 確認
+- `dotnet build cvpos10.slnx -p:BaseOutputPath=...\\.omo\\build_verify\\` 成功（Debug、0警告 / 0エラー）。起動中の実行ファイルをロックしない隔離出力先で確認した。
+- `git diff --check` 成功。半角文字を行全体の漢字モードへ送る旧パターンがないこと、58mm=2 / 80mm=6の設定バイト列を静的確認。
+- 調査スキルのfrontmatterを検証。`quick_validate.py` はバンドルPythonにPyYAMLがないため実行不可だった。
+- 実機での再印字・設定読出しは未実施。
+
+---
+
 ## [2026-07-31] 13:20 レシート・領収書の様式対応と58mm/80mm用紙幅の自動判定
 ### Agent
 - [Claude Opus 5 : Anthropic]

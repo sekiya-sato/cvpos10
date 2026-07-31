@@ -23,14 +23,14 @@ public sealed class PosPeripheralService : IDisposable
     public void ConnectDisplay()
     {
         display?.Dispose();
-        display = new Dmd30DirectController(settings.DisplayPortName, settings.DisplayBaudRate);
+        display = new Dmd30DirectController(settings.DisplayPortName);
         display.Open();
     }
 
     public void ConnectPrinter()
     {
         printer?.Dispose();
-        printer = new EpsonTmM30IiPrinter(settings.PrinterPortName, settings.PrinterBaudRate, PosPaperWidthExtensions.FromMillimeters(settings.PaperWidthMm));
+        printer = new EpsonTmM30IiPrinter(settings.PrinterPortName, PosPaperWidthExtensions.FromMillimeters(settings.PaperWidthMm));
         printer.Open();
     }
 

@@ -16,5 +16,8 @@ public static class PosPaperWidthExtensions
     /// <summary>バーコードのモジュール幅。用紙幅からはみ出さない最大値を選ぶ。</summary>
     public static byte BarcodeModuleWidth(this PosPaperWidth width) => width == PosPaperWidth.Mm80 ? (byte)3 : (byte)2;
 
+    /// <summary>TM-m30II の GS ( E Function 5（a=3）で用紙幅を指定するカスタム値。</summary>
+    public static byte CustomizedValue(this PosPaperWidth width) => width == PosPaperWidth.Mm80 ? (byte)6 : (byte)2;
+
     public static PosPaperWidth FromMillimeters(int millimeters) => millimeters >= 80 ? PosPaperWidth.Mm80 : PosPaperWidth.Mm58;
 }

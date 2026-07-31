@@ -9,6 +9,7 @@ namespace CvPos10.Devices;
 public sealed class Dmd30DirectController : IDisposable
 {
     public const int DisplayLineByteLength = 20;
+    private const int BaudRate = 19200;
     private static readonly byte[] InitializeDisplayCommand = { 0x1B, 0x40 };
 
     // US ( G, pL=2, pH=0, fn=97, m=1: Shift_JISコード体系を選択します。
@@ -18,14 +19,14 @@ public sealed class Dmd30DirectController : IDisposable
     private readonly Encoding shiftJis;
     private bool disposed;
 
-    public Dmd30DirectController(string portName, int baudRate)
+    public Dmd30DirectController(string portName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(portName);
 
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         shiftJis = Encoding.GetEncoding(932);
 
-        serialPort = new SerialPort(portName, baudRate, Parity.None, 8, StopBits.One)
+        serialPort = new SerialPort(portName, BaudRate, Parity.None, 8, StopBits.One)
         {
             Handshake = Handshake.None,
             WriteTimeout = 2_000

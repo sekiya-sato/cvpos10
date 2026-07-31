@@ -61,13 +61,11 @@ public sealed class EscPosBuilder
         return this;
     }
 
-    /// <summary>1 行印字する。漢字モードで囲むことで Shift_JIS の全角文字を出力できる。</summary>
+    /// <summary>1 行印字する。Shift_JIS の 2 バイト文字だけを漢字モードで出力する。</summary>
     public EscPosBuilder Line(string? text = null)
     {
-        buffer.AddRange(EnterKanjiModeCommand);
-        buffer.AddRange(shiftJis.GetBytes(text ?? string.Empty));
+        WriteText(text ?? string.Empty);
         buffer.Add(0x0A);
-        buffer.AddRange(ExitKanjiModeCommand);
         return this;
     }
 
@@ -135,6 +133,33 @@ public sealed class EscPosBuilder
     public EscPosBuilder Cut() => Feed(3).Raw(FullCutCommand);
 
     public byte[] ToArray() => [.. buffer];
+
+    private void WriteText(string text)
+    {
+        var isKanjiMode = false;
+        foreach (var character in text)
+        {
+            var bytes = shiftJis.GetBytes(character.ToString());
+            var requiresKanjiMode = bytes.Length == 2;
+            if (requiresKanjiMode && !isKanjiMode)
+            {
+                buffer.AddRange(EnterKanjiModeCommand);
+                isKanjiMode = true;
+            }
+            else if (!requiresKanjiMode && isKanjiMode)
+            {
+                buffer.AddRange(ExitKanjiModeCommand);
+                isKanjiMode = false;
+            }
+
+            buffer.AddRange(bytes);
+        }
+
+        if (isKanjiMode)
+        {
+            buffer.AddRange(ExitKanjiModeCommand);
+        }
+    }
 
     private int Width(string text) => shiftJis.GetByteCount(text);
 
