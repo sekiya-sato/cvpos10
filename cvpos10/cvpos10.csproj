@@ -13,13 +13,12 @@
     <PackageReference Include="protobuf-net.Grpc.ClientFactory" Version="1.2.2" />
     <PackageReference Include="System.IO.Ports" Version="10.0.0" />
   </ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\..\cv10\CodeShare\CodeShare.csproj" />
+		<ProjectReference Include="..\..\cv10\CvAsset\CvAsset.csproj" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\..\cv10\CodeShare\CodeShare.csproj" />
-    <ProjectReference Include="..\..\cv10\CvAsset\CvAsset.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
+	<ItemGroup>
     <Content Include="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
