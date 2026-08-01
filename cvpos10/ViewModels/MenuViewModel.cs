@@ -55,7 +55,11 @@ public partial class MenuViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void OpenJournal() => ShowNotReady("レシート一覧");
+    private void OpenJournal()
+    {
+        var dialog = new PosReceiptListView { Owner = Application.Current.MainWindow };
+        dialog.ShowDialog();
+    }
 
     [RelayCommand]
     private void ReLogin()

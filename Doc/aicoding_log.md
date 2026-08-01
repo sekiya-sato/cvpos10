@@ -1,4 +1,25 @@
 
+## [2026-08-01] 18:44 POS フル機能実装 Wave 7: レシート一覧（伝票照会・再印字・領収書印字）
+### Agent
+- kimi-k2.6 : opencode-go
+### Editor
+- OpenCode
+### 目的
+- ユーザーからの要望：POS のレシート一覧画面を実装し、過去の売上伝票を日付範囲で照会して一覧表示し、選択した伝票のレシート再印字・領収書印字を行えるようにする
+### 実施内容
+- cvpos10/ViewModels/06Uriage/PosReceiptListViewModel.cs (新規): QueryListAsync<Tran01Tenuri> で DenDay 範囲を取得し、Transactions へ表示。Init/Load コマンド。Reprint/PrintTaxInvoice コマンドで SelectedTransaction から ReceiptData を再構築し peripherals.PrintAsync/PrintTaxInvoiceAsync を呼び出す。BuildReceiptFromTran で Tran01Tenuri.Jmeisai から ReceiptLine を復元、JposPayment から金種を復元、VShain.Cd から担当者コードを復元。ConnectPrinterCommand で TM-m30II 接続
+- cvpos10/Views/06Uriage/PosReceiptListView.xaml (新規): BaseWindow、DatePicker（From/To）+ 読込ボタン、DataGrid（日付/伝票No/区分/金額/現金/カード/その他/点数/担当）、フッター（StatusMessage + プリンタ接続/再印字/領収書ボタン）
+- cvpos10/Views/06Uriage/PosReceiptListView.xaml.cs (新規): BaseWindow 継承、RequestClose で DialogResult=false
+- cvpos10/ViewModels/MenuViewModel.cs: OpenJournal を PosReceiptListView ダイアログ起動に変更（ShowNotReady 除去）
+### 技術決定 Why
+- ReceiptData の再構築は PosUriageInputViewModel.BuildReceipt と独立に実装（履歴データからの復元はカート明細とは異なるため）
+- Tran01Tenuri.Vdc（UTC Ticks）を local time に変換して SoldAt を復元
+- 税抜小計は KingakuTotal > 0 の場合 KingakuTotal、そうでなければ Total を使用（後方互換）
+### 確認
+- cvpos10: ビルド 0 警告 0 エラー
+
+---
+
 ## [2026-08-01] 18:42 POS フル機能実装 Wave 6: 各種レポート画面（日次サマリー・商品別ランキング・担当者別）
 ### Agent
 - kimi-k2.6 : opencode-go
