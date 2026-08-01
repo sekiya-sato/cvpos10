@@ -1,4 +1,25 @@
 
+## [2026-08-01] 18:42 POS フル機能実装 Wave 6: 各種レポート画面（日次サマリー・商品別ランキング・担当者別）
+### Agent
+- kimi-k2.6 : opencode-go
+### Editor
+- OpenCode
+### 目的
+- ユーザーからの要望：POS の各種レポート画面を実装し、日次サマリー・商品別ランキング・担当者別の3種類のレポートをクライアント側で集計して表示する
+### 実施内容
+- cvpos10/ViewModels/06Uriage/PosReportViewModel.cs (新規): PosReportType enum（DailySummary/ProductRanking/StaffSummary）と ReportTypeItem/ReportRow クラス。QueryListAsync<Tran01Tenuri> で DenDay 範囲を取得し、Init/Load コマンドで日次サマリー（DenDay グループ集計）・商品別ランキング（Jmeisai フラット化後 Code_Shohin グループ集計・上位100件）・担当者別（Jmeisai フラット化後 Code_Shain グループ集計）を生成。CalcFlag を使って返品をネット集計する
+- cvpos10/Views/06Uriage/PosReportView.xaml (新規): BaseWindow、ComboBox（ReportTypeItems バインド・DisplayMemberPath/SelectedValuePath）、DatePicker（From/To）、集計ボタン、DataGrid（コード/名称/件数/点数/金額）、フッター（StatusMessage + ProgressBar）
+- cvpos10/Views/06Uriage/PosReportView.xaml.cs (新規): BaseWindow 継承、RequestClose で DialogResult=false
+- cvpos10/ViewModels/MenuViewModel.cs: OpenReports を PosReportView ダイアログ起動に変更（ShowNotReady 除去）
+### 技術決定 Why
+- サーバ側に集計 RPC を追加せず、QueryListAsync<Tran01Tenuri> でヘッダー行を取得しクライアント側で Jmeisai をフラット化して LINQ でグループ集計する（Tran99Meisai の SerializedColumn 自動復元に依存）
+- 返品のネット集計は Tran01Tenuri.CalcFlag（売上=1、返品=-1）を明細行の金額・数量に乗じることで実現
+- 商品別ランキングは Amount 降順で上位 100 件に絞る（大規模データ対応）
+### 確認
+- cvpos10: ビルド 0 警告 0 エラー
+
+---
+
 ## [2026-08-01] 18:39 POS フル機能実装 Wave 5: 日次精算画面（売上集計・金種枚数・差異計算・精算保存）
 ### Agent
 - kimi-k2.6 : opencode-go

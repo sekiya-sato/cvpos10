@@ -48,7 +48,11 @@ public partial class MenuViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void OpenReports() => ShowNotReady("各種レポート");
+    private void OpenReports()
+    {
+        var dialog = new PosReportView { Owner = Application.Current.MainWindow };
+        dialog.ShowDialog();
+    }
 
     [RelayCommand]
     private void OpenJournal() => ShowNotReady("レシート一覧");
