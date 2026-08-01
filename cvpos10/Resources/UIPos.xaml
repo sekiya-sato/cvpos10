@@ -100,4 +100,12 @@
 		<Setter Property="Background" Value="{DynamicResource PosTotalPanelBackgroundBrush}" />
 		<Setter Property="materialDesign:ElevationAssist.Elevation" Value="Dp4" />
 	</Style>
+	<!--  メニュー画面の大きめボタン  -->
+	<Style x:Key="PosMenuButton"
+		BasedOn="{StaticResource MaterialDesignRaisedButton}"
+		TargetType="Button">
+		<Setter Property="FontSize" Value="20" />
+		<Setter Property="FontWeight" Value="SemiBold" />
+		<Setter Property="MinHeight" Value="72" />
+	</Style>
 </ResourceDictionary>

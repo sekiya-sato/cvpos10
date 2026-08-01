@@ -285,7 +285,6 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
     public void Dispose()
     {
         if (disposed) return;
-        AppGlobal.Shutdown();
         disposed = true;
     }
 }

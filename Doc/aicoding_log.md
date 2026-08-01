@@ -1,4 +1,25 @@
 
+## [2026-08-01] 17:43 POS フル機能実装 Phase 3: メニュー画面 + 起動フロー変更
+### Agent
+- kimi-k3 : opencode-go
+### Editor
+- OpenCode
+### 目的
+- 初期画面をメニュー化し、売上入力/精算入力/各種レポート/レシート一覧/再ログイン/終了のボタンを配置
+### 実施内容
+- cvpos10/Views/MenuView.xaml(.cs) (新規): BaseWindow 継承、ColorZone ヘッダー、UniformGrid の 6 ボタン、フッター（店舗名/ログインID/日時）
+- cvpos10/ViewModels/MenuViewModel.cs (新規): OpenSales/ReLogin/Exit コマンド。未実装ボタンは IsEnabled=false + ToolTip
+- cvpos10/Resources/UIPos.xaml: PosMenuButton スタイル追加（MaterialDesignRaisedButton 継承、FontSize=20、MinHeight=72）
+- cvpos10/App.xaml.cs: ShowUriageInput() → ShowMenu() に変更。using 整理
+- cvpos10/ViewModels/06Uriage/PosUriageInputViewModel.cs: Dispose から AppGlobal.Shutdown() を除去（メニュー復帰後に gRPC クライアントが生存するため）
+### 技術決定 Why
+- MenuView を MainWindow にして ShutdownMode=OnMainWindowClose とし、各機能は ShowDialog で開く（cvpos32 のナビゲーション方式に合わせる）
+- PosUriageInputViewModel.Dispose で AppGlobal.Shutdown() を呼んでいたため、売上画面を閉じるたびに gRPC チャネルが破棄されていた。App.OnExit に統合して多重起動を防ぐ
+### 確認
+- cvpos10: ビルド 0 警告 0 エラー。exe 起動確認: プロセスが即座に終了せず生存（ログイン画面表示まで到達）
+
+---
+
 ## [2026-08-01] 17:25 POS フル機能実装 Phase 1-2: サーバ拡張 + クライアント基盤
 ### Agent
 - kimi-k3 : opencode-go

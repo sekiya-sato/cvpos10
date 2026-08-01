@@ -1,5 +1,5 @@
+using CvPos10.Views;
 using CvPos10.Views._00System;
-using CvPos10.Views._06Uriage;
 using System.Windows;
 
 namespace CvPos10;
@@ -23,7 +23,7 @@ public partial class App : Application
         }
 
         // ログイン完了。そのまま売上入力へ遷移する
-        ShowUriageInput();
+        ShowMenu();
     }
 
     /// <summary>保存済み JWT のリフレッシュを試みる。成功すればログイン画面を出さない。</summary>
@@ -58,9 +58,9 @@ public partial class App : Application
     /// <summary>DataContext は LoginView.xaml で宣言済み（AppGlobal 経由で共有インスタンスを取得する）。</summary>
     private static bool ShowLogin() => new LoginView().ShowDialog() == true;
 
-    private void ShowUriageInput()
+    private void ShowMenu()
     {
-        var window = new PosUriageInputView();
+        var window = new MenuView();
         MainWindow = window;
         ShutdownMode = ShutdownMode.OnMainWindowClose;
         window.Show();
