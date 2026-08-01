@@ -24,8 +24,9 @@ public static class ReceiptDocumentBuilder
             .Line($"販売員:{receipt.StaffCode}")
             .Feed();
 
+        var headerText = receipt.IsReturn ? "返品レシート" : "お買上げ";
         builder.Align(EscPosAlign.Center).Emphasis(true).Scale(2, 2)
-            .Line("お買上げ")
+            .Line(headerText)
             .NormalSize().Emphasis(false)
             .Feed();
 

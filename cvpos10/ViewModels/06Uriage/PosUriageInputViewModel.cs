@@ -1,10 +1,13 @@
 using CodeShare;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using CvBase;
 using CvPos10.Models;
 using CvPos10.Services;
+using CvPos10.Views._06Uriage;
 using System.Collections.ObjectModel;
 using System.Reflection;
+using System.Windows;
 
 namespace CvPos10.ViewModels._06Uriage;
 
@@ -34,6 +37,8 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
     [ObservableProperty, NotifyPropertyChangedFor(nameof(PaymentAmount), nameof(ChangeAmount))] public partial int CashAmount { get; set; }
     [ObservableProperty, NotifyPropertyChangedFor(nameof(PaymentAmount), nameof(ChangeAmount))] public partial int CardAmount { get; set; }
     [ObservableProperty, NotifyPropertyChangedFor(nameof(PaymentAmount), nameof(ChangeAmount))] public partial int OtherAmount { get; set; }
+    [ObservableProperty] public partial bool IsReturnMode { get; set; }
+    [ObservableProperty] public partial ObservableCollection<PosHoldEntry> HoldList { get; set; } = [];
 
     /// <summary>直近に確定した売上。領収書ボタンはこれを印字する。</summary>
     [ObservableProperty, NotifyCanExecuteChangedFor(nameof(PrintTaxInvoiceCommand))] public partial ReceiptData? LastReceipt { get; set; }
@@ -125,29 +130,57 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
             var product = await client.LookupProductAsync(barcode, cancellationToken);
             if (product == null) { StatusMessage = $"バーコードが見つかりません: {barcode}"; return; }
 
-            // 明細が空の状態から 1 件目を積む＝この読取が売上の開始
-            var isSaleStart = CartLines.Count == 0;
-            var line = CartLines.FirstOrDefault(item => string.Equals(item.Barcode, barcode, StringComparison.OrdinalIgnoreCase));
-            if (line == null)
+            var line = new PosCartLine
             {
-                line = new PosCartLine { LineNo = CartLines.Count + 1, Barcode = barcode, ProductId = product.ProductId, ProductCode = product.ProductCode, ColorId = product.ColorId, ColorCode = product.ColorCode, ColorName = product.ColorName, SizeId = product.SizeId, SizeCode = product.SizeCode, SizeName = product.SizeName, Name = product.ProductName, UnitPrice = product.UnitPrice, Quantity = 1 };
-                CartLines.Add(line);
-            }
-            else line.Quantity++;
+                Barcode = barcode,
+                ProductId = product.ProductId,
+                ProductCode = product.ProductCode,
+                ColorId = product.ColorId,
+                ColorCode = product.ColorCode,
+                ColorName = product.ColorName,
+                SizeId = product.SizeId,
+                SizeCode = product.SizeCode,
+                SizeName = product.SizeName,
+                Name = product.ProductName,
+                UnitPrice = product.UnitPrice,
+                Quantity = 1,
+                Kubun = 0,
+                StaffId = settings.StaffId,
+                StaffCode = settings.ResolvedStaffCode,
+                StaffName = string.Empty
+            };
+            AddOrMergeCartLine(line);
 
-            SelectedLine = line;
             BarcodeText = string.Empty;
             NotifyTotalsChanged();
             await peripherals.UpdateDisplayAsync($"点数 {line.Quantity:N0} 金額 {line.Amount:N0}", $"合計 {TotalQuantity:N0}点 {TotalAmount:N0}", cancellationToken);
             StatusMessage = $"{line.Name} を追加しました。";
 
             // 売上開始時にレシートプリンタへ接続し、失敗はこの時点で通知する
-            // （会計確定後の印字で初めて気付くと、売上だけ登録されてレシートが出せない）
-            if (isSaleStart) await ConnectPrinterOnSaleStartAsync(cancellationToken);
+            if (CartLines.Count == 1) await ConnectPrinterOnSaleStartAsync(cancellationToken);
         }
         catch (OperationCanceledException) { StatusMessage = "バーコード読取を中止しました。"; }
         catch (Exception ex) { StatusMessage = $"バーコード読取エラー: {ex.Message}"; }
         finally { IsBusy = false; ScanBarcodeCommand.NotifyCanExecuteChanged(); }
+    }
+
+    /// <summary>
+    /// 明細が空の状態から 1 件目を積む＝この読取が売上の開始
+    /// </summary>
+    private void AddOrMergeCartLine(PosCartLine line)
+    {
+        var existing = CartLines.FirstOrDefault(item => string.Equals(item.Barcode, line.Barcode, StringComparison.OrdinalIgnoreCase));
+        if (existing == null)
+        {
+            line.LineNo = CartLines.Count + 1;
+            CartLines.Add(line);
+            SelectedLine = line;
+        }
+        else
+        {
+            existing.Quantity++;
+            SelectedLine = existing;
+        }
     }
 
     /// <summary>
@@ -197,8 +230,13 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
         {
             var response = await client.CheckoutAsync(new PosCheckoutRequest {
                 ClientSaleId = checkoutClientSaleId, StoreId = settings.StoreId, WarehouseId = settings.WarehouseId, StaffId = settings.StaffId,
-                Lines = [.. CartLines.Select(line => new PosCheckoutLine { Barcode = line.Barcode, ProductId = line.ProductId, ColorId = line.ColorId, ColorCode = line.ColorCode, ColorName = line.ColorName, SizeId = line.SizeId, SizeCode = line.SizeCode, SizeName = line.SizeName, Quantity = line.Quantity })],
+                Lines = [.. CartLines.Select(line => new PosCheckoutLine {
+                    Barcode = line.Barcode, ProductId = line.ProductId, ColorId = line.ColorId, ColorCode = line.ColorCode, ColorName = line.ColorName,
+                    SizeId = line.SizeId, SizeCode = line.SizeCode, SizeName = line.SizeName, Quantity = line.Quantity,
+                    Kubun = line.Kubun, StaffId = line.StaffId, StaffCode = line.StaffCode, StaffName = line.StaffName
+                })],
                 Payment = new PosPayment { CashAmount = CashAmount, CardAmount = CardAmount, OtherAmount = OtherAmount },
+                Kubun = IsReturnMode ? 20 : 10
             }, cancellationToken);
             if (!response.IsSuccess) { StatusMessage = response.Message; return; }
 
@@ -209,6 +247,7 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
             checkoutClientSaleId = string.Empty;
             SelectedLine = null;
             IsCheckoutMode = false;
+            IsReturnMode = false;
             CashAmount = CardAmount = OtherAmount = 0;
             NotifyTotalsChanged();
 
@@ -246,6 +285,200 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
         finally { IsBusy = false; }
     }
 
+    [RelayCommand]
+    private void DeleteLine()
+    {
+        if (SelectedLine == null) return;
+        CartLines.Remove(SelectedLine);
+        SelectedLine = null;
+        RenumberLines();
+        NotifyTotalsChanged();
+        _ = UpdateDisplayAsync();
+        StatusMessage = "行を削除しました。";
+    }
+
+    [RelayCommand]
+    private void IncreaseQuantity()
+    {
+        if (SelectedLine == null) return;
+        SelectedLine.Quantity++;
+        NotifyTotalsChanged();
+        _ = UpdateDisplayAsync();
+    }
+
+    [RelayCommand]
+    private void DecreaseQuantity()
+    {
+        if (SelectedLine == null || SelectedLine.Quantity <= 1) return;
+        SelectedLine.Quantity--;
+        NotifyTotalsChanged();
+        _ = UpdateDisplayAsync();
+    }
+
+    [RelayCommand]
+    private void ToggleLinePS()
+    {
+        if (SelectedLine == null) return;
+        SelectedLine.Kubun = SelectedLine.Kubun == 0 ? 1 : 0;
+        NotifyTotalsChanged();
+        _ = UpdateDisplayAsync();
+    }
+
+    [RelayCommand]
+    private void AssignLineStaff()
+    {
+        if (SelectedLine == null) return;
+        var dialog = new PosStaffSelectView { Owner = Application.Current.MainWindow };
+        if (dialog.ShowDialog() == true && dialog.ViewModel?.SelectedStaff is { } staff)
+        {
+            SelectedLine.StaffId = staff.Id;
+            SelectedLine.StaffCode = staff.Code;
+            SelectedLine.StaffName = staff.Name;
+            NotifyTotalsChanged();
+            _ = UpdateDisplayAsync();
+            StatusMessage = $"担当を {staff.Name} に変更しました。";
+        }
+    }
+
+    [RelayCommand]
+    private void SearchProduct()
+    {
+        var dialog = new PosProductSearchView { Owner = Application.Current.MainWindow };
+        if (dialog.ShowDialog() == true && dialog.ViewModel?.SelectedProduct is { } product)
+        {
+            AddProductLine(product, dialog.ViewModel.SelectedBarcode);
+        }
+    }
+
+    private void AddProductLine(PosProduct product, string barcode)
+    {
+        var line = new PosCartLine
+        {
+            Barcode = barcode,
+            ProductId = product.ProductId,
+            ProductCode = product.ProductCode,
+            ColorId = product.ColorId,
+            ColorCode = product.ColorCode,
+            ColorName = product.ColorName,
+            SizeId = product.SizeId,
+            SizeCode = product.SizeCode,
+            SizeName = product.SizeName,
+            Name = product.ProductName,
+            UnitPrice = product.UnitPrice,
+            Quantity = 1,
+            Kubun = 0,
+            StaffId = settings.StaffId,
+            StaffCode = settings.ResolvedStaffCode,
+            StaffName = string.Empty
+        };
+        AddOrMergeCartLine(line);
+        NotifyTotalsChanged();
+        _ = UpdateDisplayAsync();
+        StatusMessage = $"{line.Name} を追加しました。";
+    }
+
+    [RelayCommand]
+    private void HoldSale()
+    {
+        if (CartLines.Count == 0) { StatusMessage = "保留する明細がありません。"; return; }
+        var snapshot = new ObservableCollection<PosCartLine>();
+        foreach (var line in CartLines)
+        {
+            snapshot.Add(new PosCartLine
+            {
+                LineNo = line.LineNo,
+                Barcode = line.Barcode,
+                ProductId = line.ProductId,
+                ProductCode = line.ProductCode,
+                ColorId = line.ColorId,
+                ColorCode = line.ColorCode,
+                ColorName = line.ColorName,
+                SizeId = line.SizeId,
+                SizeCode = line.SizeCode,
+                SizeName = line.SizeName,
+                Name = line.Name,
+                UnitPrice = line.UnitPrice,
+                Quantity = line.Quantity,
+                Kubun = line.Kubun,
+                StaffId = line.StaffId,
+                StaffCode = line.StaffCode,
+                StaffName = line.StaffName
+            });
+        }
+        HoldList.Add(new PosHoldEntry
+        {
+            HeldAt = DateTime.Now,
+            ItemCount = CartLines.Count,
+            TotalAmount = TotalAmount,
+            Lines = snapshot
+        });
+        CartLines.Clear();
+        SelectedLine = null;
+        NotifyTotalsChanged();
+        StatusMessage = "売上を保留しました。";
+    }
+
+    [RelayCommand]
+    private void ResumeHold()
+    {
+        if (HoldList.Count == 0) { StatusMessage = "保留中の売上がありません。"; return; }
+        var dialog = new PosHoldListView(HoldList) { Owner = Application.Current.MainWindow };
+        if (dialog.ShowDialog() == true && dialog.ViewModel?.SelectedEntry is { } entry)
+        {
+            CartLines.Clear();
+            foreach (var line in entry.Lines)
+            {
+                CartLines.Add(new PosCartLine
+                {
+                    LineNo = line.LineNo,
+                    Barcode = line.Barcode,
+                    ProductId = line.ProductId,
+                    ProductCode = line.ProductCode,
+                    ColorId = line.ColorId,
+                    ColorCode = line.ColorCode,
+                    ColorName = line.ColorName,
+                    SizeId = line.SizeId,
+                    SizeCode = line.SizeCode,
+                    SizeName = line.SizeName,
+                    Name = line.Name,
+                    UnitPrice = line.UnitPrice,
+                    Quantity = line.Quantity,
+                    Kubun = line.Kubun,
+                    StaffId = line.StaffId,
+                    StaffCode = line.StaffCode,
+                    StaffName = line.StaffName
+                });
+            }
+            RenumberLines();
+            SelectedLine = CartLines.FirstOrDefault();
+            NotifyTotalsChanged();
+            StatusMessage = "保留していた売上を復元しました。";
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleReturnMode()
+    {
+        if (CartLines.Count > 0) { StatusMessage = "明細がある状態では返品モードに切り替えられません。"; return; }
+        IsReturnMode = !IsReturnMode;
+        StatusMessage = IsReturnMode ? "返品モード" : "バーコードを読み取ってください。";
+    }
+
+    private void RenumberLines()
+    {
+        int no = 1;
+        foreach (var line in CartLines) line.LineNo = no++;
+    }
+
+    private async Task UpdateDisplayAsync()
+    {
+        try
+        {
+            await peripherals.UpdateDisplayAsync($"合計 {TotalQuantity:N0}点 {TotalAmount:N0}", string.Empty, CancellationToken.None);
+        }
+        catch { /* 客用ディスプレイは必須ではない */ }
+    }
+
     private ReceiptData BuildReceipt(long saleId) => new(
         saleId,
         DateTime.Now,
@@ -262,7 +495,8 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
         OtherAmount,
         // サーバは消費税を持たないため釣銭もクライアント計算値（税込合計に対する釣銭）を使う
         ChangeAmount,
-        AppVersion);
+        AppVersion,
+        IsReturnMode);
 
     /// <summary>「10-シロ 00-サンプル」形式のカラー・サイズ表記。</summary>
     private static string FormatColorSize(PosCartLine line) =>

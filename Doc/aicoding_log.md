@@ -1,4 +1,34 @@
 
+## [2026-08-01] 18:15 POS フル機能実装 Wave 4: 売上入力拡張（行操作・検索・保留・返品・ダイアログ群）
+### Agent
+- kimi-k2.6 : opencode-go
+### Editor
+- OpenCode
+### 目的
+- ユーザーからの要望：売上入力画面に行削除・数量変更・P/S 切替・担当者割当・商品検索・保留・返品モードを追加し、3 つのダイアログを新設
+### 実施内容
+- cvpos10/ViewModels/06Uriage/PosUriageInputViewModel.cs: DeleteLine/IncreaseQuantity/DecreaseQuantity/ToggleLinePS/AssignLineStaff/SearchProduct/HoldSale/ResumeHold/ToggleReturnMode コマンドを追加。ScanBarcode から AddOrMergeCartLine を抽出し SearchProduct から再利用。CompleteCheckout で Kubun/StaffId/StaffCode/StaffName を DTO にマップし request.Kubun=IsReturnMode?20:10 を設定。BuildReceipt に IsReturn を渡す
+- cvpos10/ViewModels/06Uriage/PosHoldEntry.cs (新規): 保留データ 1 エントリ（HeldAt/ItemCount/TotalAmount/Lines）
+- cvpos10/ViewModels/06Uriage/PosProductSearchViewModel.cs (新規): テキスト検索（MasterShohin 照会）と JAN 検索（LookupProductAsync）の 2 パス。SKU 選択で PosProduct を構築し RequestClose イベントでダイアログを閉じる
+- cvpos10/Views/06Uriage/PosProductSearchView.xaml(.cs) (新規): BaseWindow、検索 TextBox+Button、商品 ListView（Code/Name/TankaJodai）、SKU ListView（Color/Size/JAN）、選択ボタン
+- cvpos10/ViewModels/06Uriage/PosStaffSelectViewModel.cs (新規): QueryListAsync<MasterShain> で全社員を読み込み、SelectedStaff + RequestClose
+- cvpos10/Views/06Uriage/PosStaffSelectView.xaml(.cs) (新規): BaseWindow、社員 ListView（Code/Name）、OK ボタン
+- cvpos10/ViewModels/06Uriage/PosHoldListViewModel.cs (新規): HoldList を受け取り、SelectedEntry + RequestClose
+- cvpos10/Views/06Uriage/PosHoldListView.xaml(.cs) (新規): BaseWindow、保留一覧 ListView（日時/件数/金額）、復元ボタン。コンストラクタで ObservableCollection<PosHoldEntry> を受け取る
+- cvpos10/Views/06Uriage/PosUriageInputView.xaml: 返品モードバナー（赤背景・IsReturnMode 連動）、ツールバー（行削除/数量±/P/S/担当/商品検索/保留/返品）、DataGrid に P/S 列（KubunToPsConverter）と担当列（StaffName）を追加
+- cvpos10/Helpers/Converters/KubunToPsConverter.cs (新規): int Kubun → "P"/"S" 変換
+- cvpos10/App.xaml: KubunToPsConverter をリソース登録
+- cvpos10/Models/ReceiptData.cs: IsReturn プロパティ（default false）を record 末尾に追加
+- cvpos10/Devices/ReceiptDocumentBuilder.cs: レシートヘッダーを IsReturn ? "返品レシート" : "お買上げ" に変更
+### 技術決定 Why
+- PosProduct に Barcode プロパティが存在しないため、PosProductSearchViewModel に SelectedBarcode を追加して JAN/SKU の Jan1 を別途返すようにした
+- ダイアログの戻り値取得は ViewModel.RequestClose イベント + View 側で DialogResult=true を設定するパターンに統一（MenuViewModel.OpenSales の ShowDialog パターンと整合）
+- 保留データの復元は PosCartLine のディープコピーで実現（参照共有を避ける）
+### 確認
+- cvpos10: ビルド 0 警告 0 エラー。exe 起動確認: プロセスが 3 秒間生存
+
+---
+
 ## [2026-08-01] 17:43 POS フル機能実装 Phase 3: メニュー画面 + 起動フロー変更
 ### Agent
 - kimi-k3 : opencode-go

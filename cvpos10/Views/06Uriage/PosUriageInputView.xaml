@@ -122,6 +122,8 @@
 			<Grid.RowDefinitions>
 				<RowDefinition Height="Auto" />
 				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
+				<RowDefinition Height="Auto" />
 				<RowDefinition Height="*" />
 				<RowDefinition Height="Auto" />
 			</Grid.RowDefinitions>
@@ -193,8 +195,19 @@
 				</DockPanel>
 			</materialDesign:ColorZone>
 
+			<!--  返品モードバナー  -->
+			<Border Grid.Row="1"
+				Margin="12,8,12,0" Padding="12,6"
+				Background="{DynamicResource MaterialDesignValidationErrorBrush}"
+				CornerRadius="4"
+				Visibility="{Binding IsReturnMode, Converter={StaticResource BooleanToVisibilityConverter}}">
+				<TextBlock HorizontalAlignment="Center"
+					FontSize="16" FontWeight="Bold" Foreground="White"
+					Text="返品モード" />
+			</Border>
+
 			<!--  ===== バーコード読取 =====  -->
-			<materialDesign:Card Grid.Row="1"
+			<materialDesign:Card Grid.Row="2"
 				Margin="12,12,12,0" Padding="16,12"
 				materialDesign:ElevationAssist.Elevation="Dp2" UniformCornerRadius="8">
 				<Grid>
@@ -233,8 +246,37 @@
 				</Grid>
 			</materialDesign:Card>
 
+			<!--  ===== ツールバー =====  -->
+			<StackPanel Grid.Row="3"
+				Margin="12,8,12,0" Orientation="Horizontal">
+				<Button Command="{Binding DeleteLineCommand}"
+					Content="行削除"
+					Style="{StaticResource PosSecondaryButton}" />
+				<Button Command="{Binding IncreaseQuantityCommand}"
+					Content="数量+"
+					Style="{StaticResource PosSecondaryButton}" />
+				<Button Command="{Binding DecreaseQuantityCommand}"
+					Content="数量-"
+					Style="{StaticResource PosSecondaryButton}" />
+				<Button Command="{Binding ToggleLinePSCommand}"
+					Content="P/S"
+					Style="{StaticResource PosSecondaryButton}" />
+				<Button Command="{Binding AssignLineStaffCommand}"
+					Content="担当"
+					Style="{StaticResource PosSecondaryButton}" />
+				<Button Command="{Binding SearchProductCommand}"
+					Content="商品検索"
+					Style="{StaticResource PosSecondaryButton}" />
+				<Button Command="{Binding HoldSaleCommand}"
+					Content="保留"
+					Style="{StaticResource PosSecondaryButton}" />
+				<Button Command="{Binding ToggleReturnModeCommand}"
+					Content="返品"
+					Style="{StaticResource PosSecondaryButton}" />
+			</StackPanel>
+
 			<!--  ===== 明細 =====  -->
-			<materialDesign:Card Grid.Row="2"
+			<materialDesign:Card Grid.Row="4"
 				Margin="12" Padding="0"
 				materialDesign:ElevationAssist.Elevation="Dp2" UniformCornerRadius="8">
 				<Grid>
@@ -289,6 +331,12 @@
 							<DataGridTextColumn Width="100"
 								Binding="{Binding SizeName}"
 								Header="サイズ" />
+							<DataGridTextColumn Width="40"
+								Binding="{Binding Kubun, Converter={StaticResource KubunToPsConverter}}"
+								Header="P/S" />
+							<DataGridTextColumn Width="100"
+								Binding="{Binding StaffName}"
+								Header="担当" />
 							<DataGridTextColumn Width="110"
 								Binding="{Binding UnitPrice, StringFormat={}{0:N0}}"
 								ElementStyle="{StaticResource DataGridRightTextBlock}"
@@ -307,7 +355,7 @@
 			</materialDesign:Card>
 
 			<!--  ===== フッター: 進捗 + 合計パネル =====  -->
-			<Grid Grid.Row="3"
+			<Grid Grid.Row="5"
 				Margin="12,0,12,12">
 				<Grid.ColumnDefinitions>
 					<ColumnDefinition Width="*" />

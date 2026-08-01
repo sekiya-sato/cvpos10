@@ -25,4 +25,5 @@ public sealed record ReceiptData(
     int CardAmount,
     int OtherAmount,
     int ChangeAmount,
-    string AppVersion);
+    string AppVersion,
+    bool IsReturn = false);
