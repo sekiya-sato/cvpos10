@@ -1,4 +1,21 @@
 
+## [2026-08-01] 20:56 ログイン後の空画面表示修正
+### Agent
+- GPT-5.6 Terra : OpenAI
+### Editor
+- Codex
+### 目的
+- ユーザーからの要望：ログイン後に何もない画面が表示される問題を解消する
+### 実施内容
+- cvpos10/Views/MenuView.xaml.cs: MenuViewのコンストラクタでInitializeComponentを呼び出し、XAMLの画面内容を読み込むようにした
+### 技術決定 Why
+- MenuViewにはコードビハインドがなく、new MenuView()がBaseWindowだけを生成していたため、既存画面と同じInitializeComponent呼び出しを追加した
+### 確認
+- dotnet build cvpos10.slnx --no-restore: 警告 0、エラー 0
+- 保存済みJWTでの起動後に「CV POS メニュー」、6つのメニューボタン、店舗・ログインID表示を確認
+
+---
+
 ## [2026-08-01] 18:44 POS フル機能実装 Wave 8: cv10 変更スタッシュ（統合完了）
 ### Agent
 - kimi-k2.6 : opencode-go
