@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\cv10\CodeShare\CodeShare.csproj" />
     <ProjectReference Include="..\..\cv10\CvAsset\CvAsset.csproj" />
+    <ProjectReference Include="..\..\cv10\CvBase\CvBase.csproj" />
   </ItemGroup>
 
   <ItemGroup>

@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls /c/gitroot/new2022/ ; echo \"--- 06Uriage ---\"; ls /c/gitroot/new2022/cv10/CvWpfclient/Views/06Uriage/; echo \"--- VM dirs ---\"; ls /c/gitroot/new2022/cv10/CvWpfclient/ViewModels/)",
+      "Read(//c/Users/user2010/.nuget/packages/materialdesignthemes/**)",
+      "Read(//c/Users/user2010/.nuget/packages/materialdesigncolors/**)",
+      "Read(//c/Users/user2010/.nuget/packages/microsoft.xaml.behaviors.wpf/**)",
+      "Read(//c/gitroot/UT/**)",
+      "Bash(dotnet --version)",
+      "PowerShell(dotnet build C:\\\\gitroot\\\\new2022\\\\cvpos10\\\\cvpos10.slnx -v m 2>&1)"
+    ]
+  }
+}

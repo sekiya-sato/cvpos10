@@ -1,7 +1,9 @@
 using CodeShare;
 using CvAsset;
+using CvBase;
 using Grpc.Core;
 using Grpc.Net.Client;
+using Newtonsoft.Json;
 using ProtoBuf.Grpc;
 using ProtoBuf.Grpc.Client;
 using System.Net.Http;
@@ -13,6 +15,7 @@ public sealed class PosGrpcClient : IDisposable
     private readonly GrpcChannel channel;
     private readonly IPointOfSaleService service;
     private readonly ILoginService loginService;
+    private readonly ICoreService coreService;
     private readonly PosSettings settings;
     private readonly Guid clientId = Guid.NewGuid();
 
@@ -22,6 +25,7 @@ public sealed class PosGrpcClient : IDisposable
         channel = GrpcChannel.ForAddress(settings.ServerUrl, new GrpcChannelOptions { HttpClient = new HttpClient { Timeout = Timeout.InfiniteTimeSpan } });
         service = channel.CreateGrpcService<IPointOfSaleService>();
         loginService = channel.CreateGrpcService<ILoginService>();
+        coreService = channel.CreateGrpcService<ICoreService>();
     }
 
     public Task<PosProduct?> LookupProductAsync(string barcode, CancellationToken cancellationToken) =>
@@ -29,6 +33,12 @@ public sealed class PosGrpcClient : IDisposable
 
     public Task<PosCheckoutResponse> CheckoutAsync(PosCheckoutRequest request, CancellationToken cancellationToken) =>
         service.CheckoutAsync(request, CreateCallContext(cancellationToken));
+
+    public Task<PosCancelSaleResponse> CancelSaleAsync(PosCancelSaleRequest request, CancellationToken cancellationToken) =>
+        service.CancelSaleAsync(request, CreateCallContext(cancellationToken));
+
+    public Task<PosSaveSeisanResponse> SaveSeisanAsync(PosSaveSeisanRequest request, CancellationToken cancellationToken) =>
+        service.SaveSeisanAsync(request, CreateCallContext(cancellationToken));
 
     public Task<LoginReply> LoginAsync(string loginId, string password, CancellationToken cancellationToken)
     {
@@ -46,6 +56,21 @@ public sealed class PosGrpcClient : IDisposable
 
     public Task<LoginReply> RefreshLoginAsync(CancellationToken cancellationToken) =>
         loginService.LoginRefreshAsync(new LoginRefresh { Token = settings.AccessToken, Info = "{}" }, CreateCallContext(cancellationToken));
+
+    /// <summary>ICoreService.Msg101_Op_Query を使ってサーバからデータを取得します。</summary>
+    public async Task<List<T>> QueryListAsync<T>(string? where, string? order, string[]? parameters, int? maxCount, CancellationToken cancellationToken)
+    {
+        var param = new QueryListParam(typeof(T), where, order, parameters, maxCount);
+        var msg = new CvMsg {
+            Flag = CvFlag.Msg101_Op_Query,
+            DataType = typeof(QueryListParam),
+            DataMsg = Common.SerializeObject(param)
+        };
+        var reply = await coreService.QueryMsgAsync(msg, CreateCallContext(cancellationToken));
+        if (reply.Code < 0) throw new InvalidOperationException(reply.DataMsg);
+        var list = JsonConvert.DeserializeObject<List<T>>(reply.DataMsg);
+        return list ?? [];
+    }
 
     private CallContext CreateCallContext(CancellationToken cancellationToken, bool includeAccessToken = true)
     {

@@ -1,3 +1,29 @@
+
+## [2026-08-01] 17:25 POS フル機能実装 Phase 1-2: サーバ拡張 + クライアント基盤
+### Agent
+- kimi-k3 : opencode-go
+### Editor
+- OpenCode
+### 目的
+- ユーザーからの要望：cvpos32 を参考に cvpos10 の初期画面をメニューとし、ログイン・売上入力・精算入力・各種レポート・レシート一覧などを備えた POS フル機能を実装（オンライン前提、マスタ DL/UL 不要）
+### 実施内容
+- cv10/CodeShare/IPointOfSaleService.cs: PosCheckoutRequest/Line に Kubun/StaffId/StaffCode/StaffName を追加、CancelSaleAsync/SaveSeisanAsync RPC を新設
+- cv10/CvBase/BaseDb3Pos.cs (新規): Tran02PosSeisan エンティティ（POS 日次精算テーブル）を定義
+- cv10/CvBase/DefineDataTable.cs: Tran02PosSeisan を tableTypes に追加（サーバ起動時自動 CreateTable）
+- cv10/CvServer/Services/PointOfSaleService.cs: 返品（Kubun=20 対応・在庫自動戻し）、取消（PosClientSaleId+":C" で取消伝票生成）、SaveSeisanAsync（金種算出・SeisanCnt インクリメント）を実装
+- cvpos10/cvpos10.csproj: CvBase ProjectReference を追加
+- cvpos10/Services/PosGrpcClient.cs: ICoreService チャネル生成、QueryListAsync<T>（汎用照会）/CancelSaleAsync/SaveSeisanAsync のクライアントラッパを追加
+### 技術決定 Why
+- 照会系は ICoreService+QueryListParam のみ（任意 SQL 禁止）で cv10 変更を最小化。書込み系は型付き RPC でサーバ側で一貫したバリデーション・在庫連動を実現
+- Tran02PosSeisan は DefineDataTable の既存 CreateTable 仕組みに 1 行追加するだけでサーバ起動時に自動作成されるため、マイグレーション不要
+- クライアント側の集計（レポート・精算・ジャーナル）でサーバ負荷を抑えつつ、既存 Tran01Tenuri のみで照会完結
+### 影響範囲
+- cv10 側: 4 ファイルのみ変更。他セッションの未コミット変更（CvWpfclient/*）には一切触れない
+### 確認
+- CvServer: ビルド 0 警告 0 エラー
+- cvpos10: ビルド 0 警告 0 エラー（CvBase 参照追加後も Newtonsoft.Json は CvBase から推移的に解決）
+
+---
 # aicoding_log (cvpos10)
 
 AI エージェントによる作業ログ。新しい作業を **先頭に挿入** する。
