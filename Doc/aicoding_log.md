@@ -1,4 +1,27 @@
 
+## [2026-08-01] 18:44 POS フル機能実装 Wave 8: cv10 変更スタッシュ（統合完了）
+### Agent
+- kimi-k2.6 : opencode-go
+### Editor
+- OpenCode
+### 目的
+- ユーザーからの要望：creativevision10（cv10）プロジェクトの修正をコミットせずスタッシュに保存し、統合完了を明記する
+### 実施内容
+- cv10（C:\gitroot\new2022\cv10）の変更を git stash に保存
+  - CodeShare/IPointOfSaleService.cs: PosCheckoutRequest/PosCheckoutLine/PosPayment/PosBarcodeLookupRequest/PosProduct/PosCancelSaleRequest/PosCancelSaleResponse/PosSaveSeisanRequest/PosSaveSeisanResponse/PosPaymentDetail DTO 追加、IPointOfSaleService インターフェース拡張
+  - CvBase/BaseDb3Pos.cs: Tran02PosSeisan エンティティ + PosSeisanSummary + PosPaymentDetail 新規定義
+  - CvBase/DefineDataTable.cs: Tran02PosSeisan の DefineDataTable 登録追加
+  - CvServer/Services/PointOfSaleService.cs: CheckoutAsync/CancelSaleAsync/SaveSeisanAsync 実装、Tran01Tenuri 作成ロジック（Jmeisai/JposPayment 格納）
+- cvpos10: 全 Wave（1～7）のビルド 0 警告 0 エラーを最終確認
+### 技術決定 Why
+- cv10 は共通ライブラリのため、コミット前にスタッシュで保存して影響範囲を制御（AGENTS.md 規約に従う）
+- cvpos10 側は独自の POS 機能を完結させ、cv10 側の変更は gRPC 契約・サーバ実装・DB エンティティの最小拡張に留めた
+### 確認
+- cvpos10: ビルド 0 警告 0 エラー（最終確認済）
+- cv10: git stash 保存完了、working tree clean
+
+---
+
 ## [2026-08-01] 18:44 POS フル機能実装 Wave 7: レシート一覧（伝票照会・再印字・領収書印字）
 ### Agent
 - kimi-k2.6 : opencode-go
