@@ -101,6 +101,43 @@ public partial class PosReceiptListViewModel : ObservableObject
         catch (Exception ex) { StatusMessage = $"TM-m30II 接続エラー: {ex.Message}"; }
     }
 
+    private bool CanCancelSale() =>
+        SelectedTransaction != null &&
+        SelectedTransaction.Kubun is 10 or 11 &&
+        !IsCancelled(SelectedTransaction);
+
+    private static bool IsCancelled(Tran01Tenuri tran) =>
+        !string.IsNullOrEmpty(tran.PosClientSaleId) && tran.PosClientSaleId.EndsWith(":C", StringComparison.Ordinal);
+
+    [RelayCommand(CanExecute = nameof(CanCancelSale))]
+    private async Task CancelSale(CancellationToken cancellationToken)
+    {
+        if (SelectedTransaction == null) return;
+        var result = MessageBox.Show(
+            $"売上No. {SelectedTransaction.Id:N0} を取消しますか？\n取消後は元の売上を復元できません。",
+            "取消確認",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question,
+            MessageBoxResult.No);
+        if (result != MessageBoxResult.Yes) return;
+
+        IsBusy = true;
+        try
+        {
+            var response = await client.CancelSaleAsync(new PosCancelSaleRequest
+            {
+                SaleId = SelectedTransaction.Id,
+                StaffId = settings.StaffId
+            }, cancellationToken);
+            if (!response.IsSuccess) { StatusMessage = response.Message; return; }
+            StatusMessage = $"売上No. {SelectedTransaction.Id:N0} を取消しました（取消No. {response.CancelSaleId:N0}）。";
+            await LoadAsync(cancellationToken);
+        }
+        catch (OperationCanceledException) { StatusMessage = "取消処理を中止しました。"; }
+        catch (Exception ex) { StatusMessage = $"取消エラー: {ex.Message}"; }
+        finally { IsBusy = false; }
+    }
+
     [RelayCommand]
     private void Exit() => RequestClose?.Invoke(this, EventArgs.Empty);
 

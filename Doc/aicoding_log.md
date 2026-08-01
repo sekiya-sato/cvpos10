@@ -20,6 +20,27 @@
 - cvpos10: ビルド 0 警告 0 エラー（最終確認済）
 - cv10: git stash 保存完了、working tree clean
 
+## [2026-08-01] 18:47 POS フル機能実装 Wave 7.1: レシート一覧拡張（区分表示・取消機能）
+### Agent
+- kimi-k2.6 : opencode-go
+### Editor
+- OpenCode
+### 目的
+- ユーザーからの要望：レシート一覧の区分列を数値から「売上/返品/取消」に変換し、取消ボタンを追加して CancelSaleAsync でマイナス伝票（取消）を作成する
+### 実施内容
+- cvpos10/Helpers/Converters/PosKubunMultiConverter.cs (新規): IMultiValueConverter、Kubun(int) + PosClientSaleId(string) → 「売上」(10/11) / 「返品」(20/21 かつ :C サフィックスなし) / 「取消」(20/21 かつ :C サフィックスあり)
+- cvpos10/ViewModels/06Uriage/PosReceiptListViewModel.cs: CancelSaleCommand を追加。CanCancelSale で Kubun=10/11 かつ未取消（PosClientSaleId が :C で終わらない）を判定。実行時に MessageBox で確認ダイアログを出し、PosCancelSaleRequest（SaleId + StaffId）で CancelSaleAsync を呼び出し、成功後 LoadAsync で一覧を再読み込み
+- cvpos10/Views/06Uriage/PosReceiptListView.xaml: DataGrid の区分列を MultiBinding（Kubun + PosClientSaleId）に変更。フッターに取消ボタンを追加（CanExecute 連動）
+- cvpos10/App.xaml: PosKubunMultiConverter をリソース登録
+- cv10: スタッシュをpopしてビルドし、CodeShare.dll/CvBase.dll を更新後に再度stashに保存（cvpos10のビルドが参照DLLを必要とするため）
+### 技術決定 Why
+- 取消伝票と返品伝票はどちらも Kubun=20 で、区別は PosClientSaleId の ":C" サフィックスで行う（サーバ側 CancelSaleAsync と整合）
+- MultiBinding + IMultiValueConverter を使うことで、DataGrid の各行で 2 つのプロパティ（Kubun + PosClientSaleId）を連動して評価できる
+- 取消実行前の確認ダイアログは不可逆操作のため必須
+### 確認
+- cvpos10: ビルド 0 警告 0 エラー
+- cv10: stash pop → ビルド → stash push で DLL を更新後に元に戻す
+
 ---
 
 ## [2026-08-01] 18:44 POS フル機能実装 Wave 7: レシート一覧（伝票照会・再印字・領収書印字）

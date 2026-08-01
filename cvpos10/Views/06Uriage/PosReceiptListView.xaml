@@ -89,8 +89,14 @@
 							Binding="{Binding Id, StringFormat={}{0:N0}}"
 							Header="伝票No" />
 						<DataGridTextColumn Width="70"
-							Binding="{Binding Kubun}"
-							Header="区分" />
+							Header="区分">
+							<DataGridTextColumn.Binding>
+								<MultiBinding Converter="{StaticResource PosKubunMultiConverter}">
+									<Binding Path="Kubun" />
+									<Binding Path="PosClientSaleId" />
+								</MultiBinding>
+							</DataGridTextColumn.Binding>
+						</DataGridTextColumn>
 						<DataGridTextColumn Width="120"
 							Binding="{Binding Total, StringFormat={}{0:N0}}"
 							ElementStyle="{StaticResource DataGridRightTextBlock}"
@@ -139,6 +145,11 @@
 					Content="プリンタ接続"
 					Margin="0,0,8,0"
 					Style="{StaticResource PosSecondaryButton}" />
+				<Button Command="{Binding CancelSaleCommand}"
+					Content="取消"
+					Margin="0,0,8,0"
+					Style="{StaticResource MaterialDesignOutlinedButton}"
+					ToolTip="選択した売上伝票を取消します" />
 				<Button Command="{Binding ReprintCommand}"
 					Content="再印字"
 					Margin="0,0,8,0"
