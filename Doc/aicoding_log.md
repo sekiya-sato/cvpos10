@@ -1,4 +1,27 @@
 
+## [2026-08-01] 18:39 POS フル機能実装 Wave 5: 日次精算画面（売上集計・金種枚数・差異計算・精算保存）
+### Agent
+- kimi-k2.6 : opencode-go
+### Editor
+- OpenCode
+### 目的
+- ユーザーからの要望：POS の日次精算画面を実装し、指定日の売上をサーバから照会してクライアント側で集計し、金種枚数と差異を算出して Tran02PosSeisan に保存する
+### 実施内容
+- cvpos10/ViewModels/06Uriage/PosSeisanViewModel.cs (新規): SettlementDate・売上集計プロパティ (TransactionCount/ReturnCount/TotalQuantity/TotalAmount/CashSalesTotal/CardSalesTotal/OtherSalesTotal)・金種枚数入力 (Mai10000～Mai1/JunbiAmount/KyakuSu)・差異計算 (RealAmount/CalcAmount/AmountDiff)・Init/Load/SaveSeisan/Exit コマンド。QueryListAsync<Tran01Tenuri> で DenDay+Id_Tenpo 絞り込み、CalcFlag を使って純売上を集計。SaveSeisanAsync で Tran02PosSeisan 保存後に Load で履歴を再読み込み
+- cvpos10/Views/06Uriage/PosSeisanView.xaml (新規): BaseWindow、ヘッダー、DatePicker + 集計ボタン、売上サマリー Card、金種枚数入力 Card + 差異計算 Card（AmountDiffToBrushConverter で赤/緑/黒）、精算履歴 DataGrid（営業日/回数/客数/現金残/計算残/差異/売上合計/現金売上/カード売上）、フッター（StatusMessage + 精算確定ボタン）
+- cvpos10/Views/06Uriage/PosSeisanView.xaml.cs (新規): BaseWindow 継承、RequestClose で DialogResult=false
+- cvpos10/Helpers/Converters/AmountDiffToBrushConverter.cs (新規): int 差異値 → Brushes.Red (<0) / Brushes.Green (>0) / Brushes.Black (=0)
+- cvpos10/App.xaml: AmountDiffToBrushConverter をリソース登録
+- cvpos10/ViewModels/MenuViewModel.cs: OpenSeisan を PosSeisanView ダイアログ起動に変更（ShowNotReady 除去）
+### 技術決定 Why
+- Tran01Tenuri の JposPayment (PosPaymentDetail) に金種別売上が格納されているため、QueryListAsync<Tran01Tenuri> でヘッダー行を取得しクライアント側で集計する（サーバ側集計 RPC は追加せず QueryListAsync のみで実現）
+- 返品の集計は CalcFlag (-1) を使って純売上を算出する（Kubun 20/21 の取引をそのまま引く）
+- 精算履歴 DataGrid の Jsummary 列バインディングは Tran02PosSeisan の SerializedColumn 自動復元に依存（QueryListAsync で JSON デシリアライズされる）
+### 確認
+- cvpos10: ビルド 0 警告 0 エラー。exe 起動確認: WSL 環境で GUI プロセスが複数生存したため taskkill でクリーンアップ後、ビルド成功をもって検証とした
+
+---
+
 ## [2026-08-01] 18:15 POS フル機能実装 Wave 4: 売上入力拡張（行操作・検索・保留・返品・ダイアログ群）
 ### Agent
 - kimi-k2.6 : opencode-go

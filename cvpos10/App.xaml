@@ -7,6 +7,7 @@
 			<helpers:InverseBooleanConverter x:Key="InverseBooleanConverter" />
 			<helpers:StringIsNotEmptyToVisibilityConverter x:Key="StringIsNotEmptyToVisibilityConverter" />
 			<helpers:KubunToPsConverter x:Key="KubunToPsConverter" />
+			<helpers:AmountDiffToBrushConverter x:Key="AmountDiffToBrushConverter" />
 			<BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
 			<ResourceDictionary.MergedDictionaries>
 				<ResourceDictionary Source="/Resources/UIColors.xaml" />

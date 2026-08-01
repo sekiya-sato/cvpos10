@@ -41,7 +41,11 @@ public partial class MenuViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private void OpenSeisan() => ShowNotReady("精算入力");
+    private void OpenSeisan()
+    {
+        var dialog = new PosSeisanView { Owner = Application.Current.MainWindow };
+        dialog.ShowDialog();
+    }
 
     [RelayCommand]
     private void OpenReports() => ShowNotReady("各種レポート");
