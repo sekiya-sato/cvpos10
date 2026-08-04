@@ -12,7 +12,8 @@ public sealed class EpsonPosPrinter : IDisposable
     private const int BaudRate = 115200;
     private static readonly byte[] InitializeCommand = { 0x1B, 0x40 };
     private static readonly byte[] SelectShiftJisCommand = { 0x1C, 0x43, 0x01 };
-    private static readonly byte[] SelectJapaneseInternationalCharacterSetCommand = { 0x1B, 0x52, 0x08 };
+    //private static readonly byte[] SelectUtf8Command = { 0x1C, 0x28, 0x43, 0x02, 0x00, 0x30, 0x01 }; //文字コード体系を UTF-8 に設定
+	private static readonly byte[] SelectJapaneseInternationalCharacterSetCommand = { 0x1B, 0x52, 0x08 }; //国際文字セット 日本
 
     // GS ( E Function 1 / 2: ユーザー設定モードを開始／終了（終了時にソフトウェアリセット）する。
     private static readonly byte[] EnterUserSettingModeCommand = { 0x1D, 0x28, 0x45, 0x03, 0x00, 0x01, 0x49, 0x4E };
@@ -37,7 +38,7 @@ public sealed class EpsonPosPrinter : IDisposable
 
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         shiftJis = Encoding.GetEncoding(932);
-        this.fallbackPaperWidth = fallbackPaperWidth;
+		this.fallbackPaperWidth = fallbackPaperWidth;
         PaperWidth = fallbackPaperWidth;
         serialPort = new SerialPort(portName, BaudRate, Parity.None, 8, StopBits.One)
         {
