@@ -1,5 +1,6 @@
-using System.Text.Json;
 using System.IO;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace CvPos10.Services;
 
@@ -26,12 +27,14 @@ public sealed class PosSettings
 
     public string DisplayPortName { get; init; } = "COM1";
     public string PrinterPortName { get; init; } = "COM6";
+    public string PosDisplayName { get; init; } = "DM-D30";
+    public string PosPrinterName { get; init; } = "TM-m30II";
 
     /// <summary>
     /// レシート用紙幅(mm)。58 または 80。接続時に TM-m30II の設定もこの値へ切り替える。
     /// 用紙幅の問い合わせに応答しない場合は、レイアウト上の既定値としてのみ使う。
     /// </summary>
-    public int PaperWidthMm { get; init; } = 58;
+    public int PaperWidthMm { get; init; } = 80;
 
     public string AccessToken { get; set; } = string.Empty;
 
@@ -40,9 +43,38 @@ public sealed class PosSettings
 
     public static PosSettings Load()
     {
-        var path = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
-        return File.Exists(path)
-            ? JsonSerializer.Deserialize<PosSettings>(File.ReadAllText(path), new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new PosSettings()
-            : new PosSettings();
+        var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+        var settingsJson = LoadJsonFile("appsettings.json") ?? new JsonObject();
+        var environmentName = Environment.GetEnvironmentVariable("DOTNET_ENVIRONMENT")
+            ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
+
+        if (!string.IsNullOrWhiteSpace(environmentName))
+        {
+            var environmentSettingsJson = LoadJsonFile($"appsettings.{environmentName}.json");
+            if (environmentSettingsJson is not null) Merge(settingsJson, environmentSettingsJson);
+        }
+
+        return settingsJson.Deserialize<PosSettings>(options) ?? new PosSettings();
+    }
+
+    private static JsonObject? LoadJsonFile(string fileName)
+    {
+        var path = Path.Combine(AppContext.BaseDirectory, fileName);
+        return File.Exists(path) ? JsonNode.Parse(File.ReadAllText(path))?.AsObject() : null;
+    }
+
+    private static void Merge(JsonObject destination, JsonObject source)
+    {
+        foreach (var (propertyName, sourceValue) in source)
+        {
+            if (sourceValue is JsonObject sourceObject && destination[propertyName] is JsonObject destinationObject)
+            {
+                Merge(destinationObject, sourceObject);
+            }
+            else
+            {
+                destination[propertyName] = sourceValue?.DeepClone();
+            }
+        }
     }
 }

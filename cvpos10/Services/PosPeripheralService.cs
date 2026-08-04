@@ -40,14 +40,14 @@ public sealed class PosPeripheralService : IDisposable
     /// <summary>お買上げレシートを印字する。</summary>
     public Task PrintAsync(ReceiptData receipt, CancellationToken cancellationToken)
     {
-        if (printer?.IsOpen != true) throw new InvalidOperationException("TM-m30II が接続されていません。");
+        if (printer?.IsOpen != true) throw new InvalidOperationException($"{settings.PosPrinterName} が接続されていません。");
         return Task.Run(() => printer.PrintReceipt(receipt), cancellationToken);
     }
 
     /// <summary>領収書を印字する。</summary>
     public Task PrintTaxInvoiceAsync(ReceiptData receipt, CancellationToken cancellationToken)
     {
-        if (printer?.IsOpen != true) throw new InvalidOperationException("TM-m30II が接続されていません。");
+        if (printer?.IsOpen != true) throw new InvalidOperationException($"{settings.PosPrinterName} が接続されていません。");
         return Task.Run(() => printer.PrintTaxInvoice(receipt), cancellationToken);
     }
 

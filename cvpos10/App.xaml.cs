@@ -30,25 +30,26 @@ public partial class App : Application
     private static async Task<bool> TryRestoreSessionAsync()
     {
         var savedToken = AppGlobal.TokenStore.Load();
-		//環境変数 AccessToken が設定されていれば、そちらを優先する
-		var envToken = Environment.GetEnvironmentVariable("AccessToken");
-		AppGlobal.Settings.AccessToken = savedToken.Token ?? envToken??"";
+		var configuredToken = AppGlobal.Settings.AccessToken;
 		AppGlobal.LoginId = savedToken.LoginId;
-        if (string.IsNullOrWhiteSpace(AppGlobal.Settings.AccessToken)) return false;
 
-        try
+        foreach (var accessToken in new[] { configuredToken, savedToken.Token }.Where(token => !string.IsNullOrWhiteSpace(token)).Distinct())
         {
-            var reply = await AppGlobal.Client.RefreshLoginAsync(CancellationToken.None);
-            if (reply.Result == 0 && reply.JwtMessage.Length > 10)
+            AppGlobal.Settings.AccessToken = accessToken;
+            try
             {
-                AppGlobal.Settings.AccessToken = reply.JwtMessage;
-                AppGlobal.TokenStore.Save(savedToken.LoginId, reply.JwtMessage, reply.Expire);
-                return true;
+                var reply = await AppGlobal.Client.RefreshLoginAsync(CancellationToken.None);
+                if (reply.Result == 0 && reply.JwtMessage.Length > 10)
+                {
+                    AppGlobal.Settings.AccessToken = reply.JwtMessage;
+                    AppGlobal.TokenStore.Save(savedToken.LoginId, reply.JwtMessage, reply.Expire);
+                    return true;
+                }
             }
-        }
-        catch
-        {
-            // Ignore: サーバー未起動・通信エラー時はログイン画面へフォールバックする
+            catch
+            {
+                // Ignore: サーバー未起動・通信エラー時は次のトークンまたはログイン画面へフォールバックする
+            }
         }
 
         // ログインIDはログイン画面の初期値として残す

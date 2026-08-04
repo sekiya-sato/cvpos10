@@ -97,8 +97,8 @@ public partial class PosReceiptListViewModel : ObservableObject
     [RelayCommand]
     private async Task ConnectPrinter()
     {
-        try { await Task.Run(peripherals.ConnectPrinter); StatusMessage = $"TM-m30II を {settings.PrinterPortName} に接続しました。"; }
-        catch (Exception ex) { StatusMessage = $"TM-m30II 接続エラー: {ex.Message}"; }
+        try { await Task.Run(peripherals.ConnectPrinter); StatusMessage = $"{settings.PosPrinterName} を {settings.PrinterPortName} に接続しました。"; }
+        catch (Exception ex) { StatusMessage = $"{settings.PosPrinterName} 接続エラー: {ex.Message}"; }
     }
 
     private bool CanCancelSale() =>

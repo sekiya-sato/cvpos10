@@ -108,16 +108,16 @@ public partial class PosUriageInputViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void ConnectDisplay()
     {
-        try { peripherals.ConnectDisplay(); IsDisplayConnected = true; StatusMessage = $"DM-D30 を {settings.DisplayPortName} に接続しました。"; }
-        catch (Exception ex) { IsDisplayConnected = false; StatusMessage = $"DM-D30 接続エラー: {ex.Message}"; }
+        try { peripherals.ConnectDisplay(); IsDisplayConnected = true; StatusMessage = $"{settings.PosDisplayName} を {settings.DisplayPortName} に接続しました。"; }
+        catch (Exception ex) { IsDisplayConnected = false; StatusMessage = $"{settings.PosDisplayName} 接続エラー: {ex.Message}"; }
     }
 
     /// <summary>接続ボタンによる手動接続。Open がブロックしうるため UI スレッドから外す。</summary>
     [RelayCommand]
     private async Task ConnectPrinter()
     {
-        try { await Task.Run(peripherals.ConnectPrinter); IsPrinterConnected = true; StatusMessage = $"TM-m30II を {settings.PrinterPortName} に接続しました。"; }
-        catch (Exception ex) { IsPrinterConnected = false; StatusMessage = $"TM-m30II 接続エラー: {ex.Message}"; }
+        try { await Task.Run(peripherals.ConnectPrinter); IsPrinterConnected = true; StatusMessage = $"{settings.PosPrinterName} を {settings.PrinterPortName} に接続しました。"; }
+        catch (Exception ex) { IsPrinterConnected = false; StatusMessage = $"{settings.PosPrinterName} 接続エラー: {ex.Message}"; }
     }
 
     [RelayCommand(CanExecute = nameof(CanScanBarcode), IncludeCancelCommand = true)]

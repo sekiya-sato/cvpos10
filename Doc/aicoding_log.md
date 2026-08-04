@@ -1,4 +1,24 @@
 
+## [2026-08-04] 14:46 環境別POS設定と初期アクセストークン接続
+### Agent
+- GPT-5 : OpenAI
+### Editor
+- Codex
+### 目的
+- ユーザーからの要望：環境別 appsettings の読み込み、POS機器名・用紙幅の既定値、設定ファイル指定トークンの優先接続を追加する
+### 実施内容
+- cvpos10/Services/PosSettings.cs: DOTNET_ENVIRONMENT（未設定時は ASPNETCORE_ENVIRONMENT）に対応する appsettings.{環境名}.json を基本設定へマージし、PosDisplayName・PosPrinterName と PaperWidthMm=80 の既定値を追加
+- cvpos10/App.xaml.cs: 設定ファイルの AccessToken を保存済みトークンより先にリフレッシュ接続し、失敗時は保存済みトークンへフォールバックするよう変更
+- cvpos10/Services/PosPeripheralService.cs、cvpos10/ViewModels/06Uriage/*: 設定したPOS機器名を接続・エラーメッセージへ反映
+- cvpos10/cvpos10.csproj: appsettings.*.json をビルド出力へコピーするよう変更
+### 技術決定 Why
+- 設定ファイルのJSONを環境別JSONで再帰的に上書きしてから既存の PosSettings へ復元するため、新たな設定ライブラリを増やさず既存の設定形式を維持できる
+- 設定トークンの接続が失敗しても保存済みトークンを試すため、環境別の一時的な設定ミスで既存セッションを不必要に失わない
+### 確認
+- DOTNET_ENVIRONMENT=Development、ASPNETCORE_ENVIRONMENT=Development で dotnet build cvpos10.slnx --no-restore: 警告 0、エラー 0
+
+---
+
 ## [2026-08-01] 20:56 ログイン後の空画面表示修正
 ### Agent
 - GPT-5.6 Terra : OpenAI
