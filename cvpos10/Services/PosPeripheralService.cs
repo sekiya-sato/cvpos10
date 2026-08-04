@@ -6,8 +6,8 @@ namespace CvPos10.Services;
 public sealed class PosPeripheralService : IDisposable
 {
     private readonly PosSettings settings;
-    private Dmd30DirectController? display;
-    private EpsonTmM30IiPrinter? printer;
+    private EpsonDisplayController? display;
+    private EpsonPosPrinter? printer;
 
     public PosPeripheralService(PosSettings settings) => this.settings = settings;
 
@@ -23,14 +23,14 @@ public sealed class PosPeripheralService : IDisposable
     public void ConnectDisplay()
     {
         display?.Dispose();
-        display = new Dmd30DirectController(settings.DisplayPortName);
+        display = new EpsonDisplayController(settings.DisplayPortName);
         display.Open();
     }
 
     public void ConnectPrinter()
     {
         printer?.Dispose();
-        printer = new EpsonTmM30IiPrinter(settings.PrinterPortName, PosPaperWidthExtensions.FromMillimeters(settings.PaperWidthMm));
+        printer = new EpsonPosPrinter(settings.PrinterPortName, PosPaperWidthExtensions.FromMillimeters(settings.PaperWidthMm));
         printer.Open();
     }
 

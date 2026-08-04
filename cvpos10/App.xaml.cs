@@ -30,9 +30,11 @@ public partial class App : Application
     private static async Task<bool> TryRestoreSessionAsync()
     {
         var savedToken = AppGlobal.TokenStore.Load();
-        AppGlobal.Settings.AccessToken = savedToken.Token;
-        AppGlobal.LoginId = savedToken.LoginId;
-        if (string.IsNullOrWhiteSpace(savedToken.Token)) return false;
+		//環境変数 AccessToken が設定されていれば、そちらを優先する
+		var envToken = Environment.GetEnvironmentVariable("AccessToken");
+		AppGlobal.Settings.AccessToken = savedToken.Token ?? envToken??"";
+		AppGlobal.LoginId = savedToken.LoginId;
+        if (string.IsNullOrWhiteSpace(AppGlobal.Settings.AccessToken)) return false;
 
         try
         {

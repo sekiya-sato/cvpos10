@@ -6,7 +6,7 @@ namespace CvPos10.Devices;
 /// <summary>
 /// EPSON DM-D30 にESC/POS互換のシリアルコマンドを送信します。
 /// </summary>
-public sealed class Dmd30DirectController : IDisposable
+public sealed class EpsonDisplayController : IDisposable
 {
     public const int DisplayLineByteLength = 20;
     private const int BaudRate = 19200;
@@ -19,7 +19,7 @@ public sealed class Dmd30DirectController : IDisposable
     private readonly Encoding shiftJis;
     private bool disposed;
 
-    public Dmd30DirectController(string portName)
+    public EpsonDisplayController(string portName)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(portName);
 

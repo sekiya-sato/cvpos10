@@ -7,7 +7,7 @@ namespace CvPos10.Devices;
 /// <summary>
 /// TM-m30II へ Bluetooth の仮想 COM ポート経由で ESC/POS コマンドを送信します。
 /// </summary>
-public sealed class EpsonTmM30IiPrinter : IDisposable
+public sealed class EpsonPosPrinter : IDisposable
 {
     private const int BaudRate = 115200;
     private static readonly byte[] InitializeCommand = { 0x1B, 0x40 };
@@ -31,7 +31,7 @@ public sealed class EpsonTmM30IiPrinter : IDisposable
     private readonly PosPaperWidth fallbackPaperWidth;
     private bool disposed;
 
-    public EpsonTmM30IiPrinter(string portName, PosPaperWidth fallbackPaperWidth = PosPaperWidth.Mm58)
+    public EpsonPosPrinter(string portName, PosPaperWidth fallbackPaperWidth = PosPaperWidth.Mm58)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(portName);
 

@@ -3,3 +3,8 @@ obj/
 .vs/
 .omo/
 TMVirtualPortDriver*.zip
+launchSettings.json
+appsettings.*.json
+
+
+
