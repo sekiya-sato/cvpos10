@@ -12,8 +12,10 @@ public sealed class EpsonPosPrinter : IDisposable
     private const int BaudRate = 115200;
     private static readonly byte[] InitializeCommand = { 0x1B, 0x40 };
     private static readonly byte[] SelectShiftJisCommand = { 0x1C, 0x43, 0x01 };
-    //private static readonly byte[] SelectUtf8Command = { 0x1C, 0x28, 0x43, 0x02, 0x00, 0x30, 0x01 }; //文字コード体系を UTF-8 に設定
-	private static readonly byte[] SelectJapaneseInternationalCharacterSetCommand = { 0x1B, 0x52, 0x08 }; //国際文字セット 日本
+    // FS ( C Function 48, m=2: 文字列のエンコード方式を UTF-8 に設定する。
+    private static readonly byte[] SelectUtf8EncodingCommand = { 0x1C, 0x28, 0x43, 0x02, 0x00, 0x30, 0x02 };
+    private static readonly byte[] SelectJapaneseInternationalCharacterSetCommand = { 0x1B, 0x52, 0x08 }; // 国際文字セット: 日本
+    private static readonly Encoding ShiftJisEncoding = CreateShiftJisEncoding();
 
     // GS ( E Function 1 / 2: ユーザー設定モードを開始／終了（終了時にソフトウェアリセット）する。
     private static readonly byte[] EnterUserSettingModeCommand = { 0x1D, 0x28, 0x45, 0x03, 0x00, 0x01, 0x49, 0x4E };
@@ -36,9 +38,8 @@ public sealed class EpsonPosPrinter : IDisposable
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(portName);
 
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        shiftJis = Encoding.GetEncoding(932);
-		this.fallbackPaperWidth = fallbackPaperWidth;
+        shiftJis = ShiftJisEncoding;
+        this.fallbackPaperWidth = fallbackPaperWidth;
         PaperWidth = fallbackPaperWidth;
         serialPort = new SerialPort(portName, BaudRate, Parity.None, 8, StopBits.One)
         {
@@ -70,7 +71,7 @@ public sealed class EpsonPosPrinter : IDisposable
         serialPort.Open();
         ConfigurePaperWidth();
         Write(InitializeCommand);
-        Write(SelectShiftJisCommand);
+        Write(SelectUtf8EncodingCommand);
         Write(SelectJapaneseInternationalCharacterSetCommand);
     }
 
@@ -79,7 +80,7 @@ public sealed class EpsonPosPrinter : IDisposable
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(receipt);
-        Write(ReceiptDocumentBuilder.BuildSalesReceipt(receipt, PaperWidth, shiftJis, DateTime.Now));
+        Write(ConvertDocumentToUtf8(ReceiptDocumentBuilder.BuildSalesReceipt(receipt, PaperWidth, shiftJis, DateTime.Now)));
     }
 
     /// <summary>領収書を印字してカットします。</summary>
@@ -87,7 +88,7 @@ public sealed class EpsonPosPrinter : IDisposable
     {
         EnsureOpen();
         ArgumentNullException.ThrowIfNull(receipt);
-        Write(ReceiptDocumentBuilder.BuildTaxInvoice(receipt, PaperWidth, shiftJis, DateTime.Now));
+        Write(ConvertDocumentToUtf8(ReceiptDocumentBuilder.BuildTaxInvoice(receipt, PaperWidth, shiftJis, DateTime.Now)));
     }
 
     /// <summary>設定済みの用紙幅を照会し、appsettings.json の指定と異なる場合だけプリンタ設定を更新する。</summary>
@@ -178,6 +179,51 @@ public sealed class EpsonPosPrinter : IDisposable
 
     internal static byte[] BuildSetPaperWidthCommand(PosPaperWidth paperWidth) =>
     [0x1D, 0x28, 0x45, 0x04, 0x00, 0x05, 0x03, paperWidth.CustomizedValue(), 0x00];
+
+    /// <summary>帳票先頭のShift_JIS選択をUTF-8選択に置き換え、印字文字をUTF-8へ変換する。</summary>
+    internal static byte[] ConvertDocumentToUtf8(byte[] document)
+    {
+        ArgumentNullException.ThrowIfNull(document);
+
+        var shiftJisOffset = InitializeCommand.Length;
+        if (!document.AsSpan().StartsWith(InitializeCommand) ||
+            !document.AsSpan(shiftJisOffset).StartsWith(SelectShiftJisCommand))
+        {
+            throw new InvalidOperationException("帳票データの先頭に想定した Shift_JIS 初期化コマンドがありません。");
+        }
+
+        // 帳票ビルダーの桁計算は全角を2桁として扱うCP932のバイト数に依存する。
+        // そのため組み立て後に文字データだけUTF-8へ変換し、既存のレイアウトを維持する。
+        var utf8Document = new List<byte>(document.Length + 64);
+        utf8Document.AddRange(InitializeCommand);
+        utf8Document.AddRange(SelectUtf8EncodingCommand);
+
+        for (var index = shiftJisOffset + SelectShiftJisCommand.Length; index < document.Length;)
+        {
+            var value = document[index];
+            if (value < 0x80)
+            {
+                utf8Document.Add(value);
+                index++;
+                continue;
+            }
+
+            var byteCount = IsShiftJisLeadByte(value) && index + 1 < document.Length ? 2 : 1;
+            utf8Document.AddRange(Encoding.UTF8.GetBytes(ShiftJisEncoding.GetString(document, index, byteCount)));
+            index += byteCount;
+        }
+
+        return [.. utf8Document];
+    }
+
+    private static bool IsShiftJisLeadByte(byte value) =>
+        value is >= 0x81 and <= 0x9F or >= 0xE0 and <= 0xFC;
+
+    private static Encoding CreateShiftJisEncoding()
+    {
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        return Encoding.GetEncoding(932);
+    }
 
     private void EnsureOpen()
     {

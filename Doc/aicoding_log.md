@@ -1,3 +1,19 @@
+## [2026-08-05] 09:05 TM-m30II 半角日本語の文字化け修正
+### Agent
+- GPT-5 : OpenAI
+### Editor
+- Codex
+### 目的
+- ユーザーからの要望：半角日本語が文字化けする TM-m30II の印字を修正する
+### 実施内容
+- cvpos10/Devices/EpsonPosPrinter.cs: 帳票の組み立ては既存CP932のまま維持し、送信直前に文字データをUTF-8へ変換して、先頭のShift_JIS選択をUTF-8選択へ置換
+### 技術決定 Why
+- TM-m30IIがサポートするESC/POSのUTF-8エンコード方式を用いることで、全角文字と半角カナを同一のUnicode経路で印字し、CP932のバイト数に依存する既存の桁計算も維持する
+### 確認
+- DOTNET_ENVIRONMENT=Development、ASPNETCORE_ENVIRONMENT=Development で dotnet build cvpos10.slnx: 警告 0、エラー 0
+- UTF-8選択コマンドが `1C 28 43 02 00 30 02` であること、および置換位置が帳票先頭の `ESC @` 直後であることを静的確認
+
+---
 
 ## [2026-08-04] 14:46 環境別POS設定と初期アクセストークン接続
 ### Agent
