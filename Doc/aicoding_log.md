@@ -1,3 +1,21 @@
+## [2026-09-04] 20:34 POS共通gRPCメッセージ経路への統一
+### Agent
+- GPT-5.6 Terra : OpenAI
+### Editor
+- Codex
+### 目的
+- ユーザーからの要望：cv10 commit e446dc3dbfcbd654a5e8e94c49be1de50f857ee9 に合わせ、POS通信を共通gRPC経路へ変更する
+### 実施内容
+- cvpos10/Services/PosGrpcClient.cs: 商品検索・売上確定・取消・日次精算を ICoreService の CvMsg 経路へ統一し、直接 IPointOfSaleService プロキシを削除
+- Doc/aicoding_log.md: 本作業の記録を先頭へ追加
+### 技術決定 Why
+- 指定コミットで追加された CvFlag 070-073 と DTO の共通シリアライズを用い、既存ViewModelの呼出し契約とキャンセル伝播を変えずに通信経路だけを統一する
+### 確認
+- dotnet build cvpos10.slnx：警告 0、エラー 0
+- git diff --check：問題なし
+
+---
+
 ## [2026-08-05] 09:05 TM-m30II 半角日本語の文字化け修正
 ### Agent
 - GPT-5 : OpenAI

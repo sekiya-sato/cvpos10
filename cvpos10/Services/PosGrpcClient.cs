@@ -13,7 +13,6 @@ namespace CvPos10.Services;
 public sealed class PosGrpcClient : IDisposable
 {
     private readonly GrpcChannel channel;
-    private readonly IPointOfSaleService service;
     private readonly ILoginService loginService;
     private readonly ICoreService coreService;
     private readonly PosSettings settings;
@@ -23,22 +22,36 @@ public sealed class PosGrpcClient : IDisposable
     {
         this.settings = settings;
         channel = GrpcChannel.ForAddress(settings.ServerUrl, new GrpcChannelOptions { HttpClient = new HttpClient { Timeout = Timeout.InfiniteTimeSpan } });
-        service = channel.CreateGrpcService<IPointOfSaleService>();
         loginService = channel.CreateGrpcService<ILoginService>();
         coreService = channel.CreateGrpcService<ICoreService>();
     }
 
-    public Task<PosProduct?> LookupProductAsync(string barcode, CancellationToken cancellationToken) =>
-        service.LookupProductAsync(new PosBarcodeLookupRequest { Barcode = barcode }, CreateCallContext(cancellationToken));
+    public async Task<PosProduct?> LookupProductAsync(string barcode, CancellationToken cancellationToken)
+    {
+        return await QueryPosAsync<PosBarcodeLookupRequest, PosProduct>(
+            CvFlag.Msg070_PosLookupProduct,
+            new PosBarcodeLookupRequest { Barcode = barcode },
+            cancellationToken,
+            allowNotFound: true);
+    }
 
-    public Task<PosCheckoutResponse> CheckoutAsync(PosCheckoutRequest request, CancellationToken cancellationToken) =>
-        service.CheckoutAsync(request, CreateCallContext(cancellationToken));
+    public async Task<PosCheckoutResponse> CheckoutAsync(PosCheckoutRequest request, CancellationToken cancellationToken)
+    {
+        return await QueryPosAsync<PosCheckoutRequest, PosCheckoutResponse>(CvFlag.Msg071_PosCheckout, request, cancellationToken)
+            ?? throw new InvalidOperationException("POS売上確定の応答がありません。");
+    }
 
-    public Task<PosCancelSaleResponse> CancelSaleAsync(PosCancelSaleRequest request, CancellationToken cancellationToken) =>
-        service.CancelSaleAsync(request, CreateCallContext(cancellationToken));
+    public async Task<PosCancelSaleResponse> CancelSaleAsync(PosCancelSaleRequest request, CancellationToken cancellationToken)
+    {
+        return await QueryPosAsync<PosCancelSaleRequest, PosCancelSaleResponse>(CvFlag.Msg072_PosCancelSale, request, cancellationToken)
+            ?? throw new InvalidOperationException("POS売上取消の応答がありません。");
+    }
 
-    public Task<PosSaveSeisanResponse> SaveSeisanAsync(PosSaveSeisanRequest request, CancellationToken cancellationToken) =>
-        service.SaveSeisanAsync(request, CreateCallContext(cancellationToken));
+    public async Task<PosSaveSeisanResponse> SaveSeisanAsync(PosSaveSeisanRequest request, CancellationToken cancellationToken)
+    {
+        return await QueryPosAsync<PosSaveSeisanRequest, PosSaveSeisanResponse>(CvFlag.Msg073_PosSaveSeisan, request, cancellationToken)
+            ?? throw new InvalidOperationException("POS日次精算の応答がありません。");
+    }
 
     public Task<LoginReply> LoginAsync(string loginId, string password, CancellationToken cancellationToken)
     {
@@ -70,6 +83,29 @@ public sealed class PosGrpcClient : IDisposable
         if (reply.Code < 0) throw new InvalidOperationException(reply.DataMsg);
         var list = JsonConvert.DeserializeObject<List<T>>(reply.DataMsg);
         return list ?? [];
+    }
+
+    private async Task<TResponse?> QueryPosAsync<TRequest, TResponse>(CvFlag flag, TRequest request, CancellationToken cancellationToken, bool allowNotFound = false)
+        where TRequest : class
+        where TResponse : class
+    {
+        var reply = await coreService.QueryMsgAsync(new CvMsg {
+            Flag = flag,
+            DataType = typeof(TRequest),
+            DataMsg = Common.SerializeObject(request),
+        }, CreateCallContext(cancellationToken));
+
+        if (reply.Flag != flag) {
+            throw new InvalidOperationException($"POS応答フラグが不正です。期待値={flag} 実際={reply.Flag}");
+        }
+        if (allowNotFound && reply.Code == CvMsgErrorCode.NotFound) return null;
+        if (reply.Code < 0) throw new InvalidOperationException(string.IsNullOrWhiteSpace(reply.Option) ? reply.DataMsg : reply.Option);
+        if (reply.DataType != typeof(TResponse)) {
+            throw new InvalidOperationException($"POS応答型が不正です。期待値={typeof(TResponse).Name} 実際={reply.DataType?.Name}");
+        }
+
+        return Common.DeserializeObject(reply.DataMsg ?? string.Empty, reply.DataType) as TResponse
+            ?? throw new InvalidOperationException("POS応答の復元に失敗しました。");
     }
 
     private CallContext CreateCallContext(CancellationToken cancellationToken, bool includeAccessToken = true)
